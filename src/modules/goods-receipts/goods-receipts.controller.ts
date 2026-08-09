@@ -1,0 +1,209 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Body,
+  Query,
+  UseInterceptors,
+  UploadedFile,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiParam,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
+import { GoodsReceiptsService } from './goods-receipts.service';
+import { CreateGoodsReceiptDto } from './dto/create-goods-receipt.dto';
+import { GoodsReceiptItemDto } from './dto/goods-receipt-item.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { PaginationQueryDto } from '../../common/pagination';
+import { IsOptional, IsString } from 'class-validator';
+
+class GoodsReceiptsQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+}
+
+@ApiTags('Goods Receipts')
+@Controller('goods-receipts')
+export class GoodsReceiptsController {
+  constructor(
+    private readonly service: GoodsReceiptsService,
+  ) {}
+
+  @Post()
+  @Roles('admin', 'store_keeper')
+  @UseInterceptors(
+    FileInterceptor('invoiceDocument', {
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
+        if (!allowed.includes(file.mimetype)) {
+          return cb(
+            new BadRequestException('Invoice file must be PDF, JPG, or PNG'),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a goods receipt with batch items' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        invoiceDocument: {
+          type: 'string',
+          format: 'binary',
+          description: 'Invoice file (PDF, JPG, PNG, max 10MB)',
+        },
+        supplierId: { type: 'string', format: 'uuid' },
+        grnNumber: { type: 'string', example: 'GRN-2026-001' },
+        receiptDate: { type: 'string', example: '2026-08-03' },
+        taxPaid: { type: 'boolean', default: false },
+        paymentDueDateType: {
+          type: 'string',
+          enum: ['one_month', 'two_months', 'six_months', 'one_year', 'other'],
+          default: 'one_month',
+        },
+        paymentDueDate: { type: 'string', format: 'date', description: 'Required when paymentDueDateType is other' },
+        items: { type: 'string', description: 'JSON array of items' },
+      },
+      required: ['supplierId', 'receiptDate', 'items'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'GRN created with batches and stock movements',
+  })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({
+    status: 409,
+    description: 'GRN number already exists for this supplier',
+  })
+  async create(
+    @Body() body: Record<string, unknown>,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() currentUser: Record<string, unknown>,
+  ) {
+    const userId = currentUser?.sub as string | undefined;
+    const branchId = currentUser?.branchId as string | undefined;
+
+    if (!userId) {
+      throw new BadRequestException(
+        'Current user identifier is required to create a goods receipt',
+      );
+    }
+
+    if (!branchId) {
+      throw new BadRequestException(
+        'Branch ID is required to create a goods receipt',
+      );
+    }
+
+    const itemsValue = body.items;
+    const items: GoodsReceiptItemDto[] =
+      typeof itemsValue === 'string'
+        ? JSON.parse(itemsValue)
+        : itemsValue;
+
+    const dto: CreateGoodsReceiptDto = {
+      supplierId: body.supplierId as string,
+      receiptDate: body.receiptDate as string,
+      grnNumber: (body.grnNumber as string | undefined) ?? undefined,
+      items,
+      taxPaid: body.taxPaid as boolean | undefined,
+      paymentDueDateType: body.paymentDueDateType as 'one_month' | 'two_months' | 'six_months' | 'one_year' | 'other' | undefined,
+      paymentDueDate: (body.paymentDueDate as string | undefined) ?? undefined,
+    };
+
+    return this.service.create(dto, file, userId, branchId);
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'List goods receipts with pagination, search, and filtering',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search by GRN number',
+  })
+  @ApiQuery({
+    name: 'supplierId',
+    required: false,
+    description: 'Filter by supplier UUID',
+  })
+  @ApiQuery({
+    name: 'branchId',
+    required: false,
+    description: 'Filter by branch UUID',
+  })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Sort field' })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    description: 'Sort order',
+    enum: ['asc', 'desc'],
+  })
+  @ApiResponse({ status: 200, description: 'Paginated list of goods receipts' })
+  findAll(@Query() query: GoodsReceiptsQueryDto) {
+    return this.service.findAll({
+      supplierId: query.supplierId,
+      branchId: query.branchId,
+      search: query.search,
+      page: query.page!,
+      limit: query.limit!,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
+    });
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get goods receipt by ID' })
+  @ApiParam({ name: 'id', description: 'GRN UUID' })
+  @ApiResponse({ status: 200, description: 'GRN details' })
+  @ApiResponse({ status: 404, description: 'GRN not found' })
+  findOne(@Param('id') id: string) {
+    return this.service.findById(id);
+  }
+
+  @Get(':id/invoice-url')
+  @ApiOperation({ summary: 'Get signed URL for the invoice document' })
+  @ApiParam({ name: 'id', description: 'GRN UUID' })
+  @ApiResponse({ status: 200, description: 'Returns signed URL' })
+  @ApiResponse({ status: 404, description: 'GRN or invoice not found' })
+  async getInvoiceUrl(@Param('id') id: string) {
+    const url = await this.service.getInvoiceUrl(id);
+    return { url };
+  }
+}

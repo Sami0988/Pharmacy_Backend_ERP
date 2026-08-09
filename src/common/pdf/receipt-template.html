@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Courier New', monospace; font-size: 12px; padding: 20px; width: 300px; }
+    .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
+    .header h1 { font-size: 16px; margin-bottom: 4px; }
+    .header p { font-size: 10px; color: #555; }
+    .info { margin-bottom: 10px; }
+    .info p { margin-bottom: 2px; }
+    .info span { float: right; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    th { text-align: left; border-bottom: 1px solid #000; padding: 4px 0; font-size: 10px; }
+    td { padding: 4px 0; font-size: 11px; }
+    .col-qty { text-align: center; width: 40px; }
+    .col-price { text-align: right; width: 60px; }
+    .col-total { text-align: right; width: 70px; }
+    .totals { border-top: 1px dashed #000; padding-top: 5px; }
+    .totals .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+    .totals .grand { font-weight: bold; font-size: 13px; border-top: 1px solid #000; padding-top: 5px; margin-top: 5px; }
+    .footer { text-align: center; margin-top: 15px; font-size: 10px; color: #555; border-top: 1px dashed #000; padding-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>{{storeName}}</h1>
+    <p>Sales Receipt</p>
+  </div>
+
+  <div class="info">
+    <p>Date: <span>{{saleDate}}</span></p>
+    <p>Receipt #: <span>{{receiptNumber}}</span></p>
+    <p>Cashier: <span>{{cashierName}}</span></p>
+    {{#if customerName}}
+    <p>Customer: <span>{{customerName}}</span></p>
+    {{/if}}
+    <p>Payment: <span>{{paymentMethod}}</span></p>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th class="col-qty">Qty</th>
+        <th class="col-price">Price</th>
+        <th class="col-total">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each items}}
+      <tr>
+        <td>
+          {{this.itemName}}<br>
+          <small>Batch: {{this.batchNo}}</small>
+        </td>
+        <td class="col-qty">{{this.quantity}}</td>
+        <td class="col-price">{{this.unitPrice}}</td>
+        <td class="col-total">{{this.lineTotal}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="row grand">
+      <span>TOTAL</span>
+      <span>{{totalAmount}}</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>Thank you for your purchase!</p>
+    <p>Keep this receipt for returns.</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786108838691,
+      "tag": "0000_add_user_branch_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786179834397,
+      "tag": "0001_cool_obadiah_stane",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786265948925,
+      "tag": "0002_easy_famine",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786270438125,
+      "tag": "0003_open_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786272535604,
+      "tag": "0004_dazzling_xorn",
+      "breakpoints": true
+    }
+  ]
+}
