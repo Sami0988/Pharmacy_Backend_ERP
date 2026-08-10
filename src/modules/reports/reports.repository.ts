@@ -13,7 +13,7 @@ import {
   users,
   supplierPayments,
 } from '../../db';
-import { eq, and, sql, desc, count } from 'drizzle-orm';
+import { eq, and, sql, desc, count, ilike } from 'drizzle-orm';
 import { paginate, PaginatedResponse } from '../../common/pagination';
 
 @Injectable()
@@ -67,8 +67,12 @@ export class ReportsRepository {
     }));
   }
 
-  async getStockReport(params: { page: number; limit: number }): Promise<PaginatedResponse<any>> {
-    const whereClause = sql`${locations.name} IN ('Store', 'Dispatcher')`;
+  async getStockReport(params: { page: number; limit: number }, search?: string): Promise<PaginatedResponse<any>> {
+    const conditions: any[] = [sql`${locations.name} IN ('Store', 'Dispatcher')`];
+    if (search) {
+      conditions.push(sql`(similarity(${items.name}, ${search}) > 0.1 OR ${ilike(items.name, `%${search}%`)})`);
+    }
+    const whereClause = and(...conditions);
 
     const baseQuery = this.databaseService.db
       .select({
@@ -437,6 +441,63 @@ export class ReportsRepository {
       .select({ id: locations.id, name: locations.name })
       .from(locations);
     return new Map(locs.map((l) => [l.id, l.name]));
+  }
+
+  async getStockByBatch(itemId?: string) {
+    const dispatcherLocations = await this.databaseService.db
+      .select({ id: locations.id })
+      .from(locations)
+      .where(eq(locations.name, 'Dispatcher'));
+
+    if (dispatcherLocations.length === 0) return [];
+
+    const dispatcherIds = dispatcherLocations.map((l) => l.id);
+
+    const conditions = [
+      sql`${stockMovements.locationId} IN ${dispatcherIds}`,
+    ];
+
+    if (itemId) {
+      conditions.push(eq(batches.itemId, itemId));
+    }
+
+    const result = await this.databaseService.db
+      .select({
+        batchId: batches.id,
+        batchNo: batches.batchNo,
+        itemId: batches.itemId,
+        itemName: items.name,
+        expiryDate: batches.expiryDate,
+        unitCost: batches.unitCost,
+        sellingPrice: batches.sellingPrice,
+        quantity: sql<number>`coalesce(sum(${stockMovements.quantity}), 0)`,
+      })
+      .from(batches)
+      .innerJoin(items, eq(batches.itemId, items.id))
+      .innerJoin(stockMovements, eq(stockMovements.batchId, batches.id))
+      .where(and(...conditions))
+      .groupBy(
+        batches.id,
+        batches.batchNo,
+        batches.itemId,
+        batches.expiryDate,
+        batches.unitCost,
+        batches.sellingPrice,
+        items.name,
+      )
+      .having(sql`sum(${stockMovements.quantity}) > 0`)
+      .orderBy(batches.expiryDate);
+
+    return result.map((r) => ({
+      batchId: r.batchId,
+      batchNo: r.batchNo,
+      itemId: r.itemId,
+      itemName: r.itemName,
+      expiryDate: r.expiryDate,
+      unitCost: Number(r.unitCost),
+      sellingPrice: Number(r.sellingPrice),
+      quantity: Number(r.quantity),
+    }));
   }
 
   async getLastSaleDate(itemId: string): Promise<string | null> {

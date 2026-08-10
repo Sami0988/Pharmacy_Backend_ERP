@@ -104,12 +104,13 @@ export class TransfersController {
   @ApiQuery({ name: 'sortOrder', required: false, description: 'Sort order', enum: ['asc', 'desc'] })
   @ApiResponse({ status: 200, description: 'Paginated list of transfers' })
   findAll(@Query() query: TransfersQueryDto) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(query.itemId ?? '');
     return this.service.findAll({
       page: query.page!,
       limit: query.limit!,
-      search: query.search,
+      search: isUuid ? query.search : (query.itemId ?? query.search),
       batchId: query.batchId,
-      itemId: query.itemId,
+      itemId: isUuid ? query.itemId : undefined,
       fromDate: query.fromDate,
       toDate: query.toDate,
       sortBy: query.sortBy,

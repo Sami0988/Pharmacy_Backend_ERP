@@ -246,6 +246,9 @@ export class GoodsReceiptsService {
     if (!grn) {
       throw new NotFoundException(`Goods receipt ${id} not found`);
     }
+    if (grn.invoiceDocumentUrl) {
+      grn.invoiceDocumentUrl = await this.minioService.getSignedUrl('invoices', grn.invoiceDocumentUrl);
+    }
     return grn;
   }
 

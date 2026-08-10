@@ -7,12 +7,14 @@ import { PdfExportService } from './pdf-export.service';
 import { ReportsRepository } from '../../modules/reports/reports.repository';
 import { StorageModule } from '../../common/storage/storage.module';
 import { DatabaseModule } from '../../db/database.module';
+import { PdfModule } from '../pdf/pdf.module';
 
 @Module({
   imports: [
     BullModule.registerQueue({ name: 'export-jobs' }),
     StorageModule,
     DatabaseModule,
+    PdfModule,
   ],
   controllers: [ExportJobController],
   providers: [ExportJobService, ExportJobProcessor, PdfExportService, ReportsRepository],

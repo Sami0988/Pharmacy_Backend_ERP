@@ -21,4 +21,8 @@ export class UpdateSupplierDto {
   @IsString()
   @IsOptional()
   licenseNo?: string;
+
+  @IsString()
+  @IsOptional()
+  licenseNumber?: string;
 }

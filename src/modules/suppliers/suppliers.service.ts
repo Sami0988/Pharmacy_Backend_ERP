@@ -45,14 +45,24 @@ export class SuppliersService {
   }
 
   async create(createSupplierDto: CreateSupplierDto) {
-    const result = await this.suppliersRepository.create(createSupplierDto);
+    const data = {
+      ...createSupplierDto,
+      licenseNo: createSupplierDto.licenseNo ?? createSupplierDto.licenseNumber,
+    };
+    delete (data as any).licenseNumber;
+    const result = await this.suppliersRepository.create(data);
     await this.invalidateListCache();
     return result;
   }
 
   async update(id: string, updateSupplierDto: UpdateSupplierDto) {
     await this.findOne(id);
-    const result = await this.suppliersRepository.update(id, updateSupplierDto);
+    const data = {
+      ...updateSupplierDto,
+      licenseNo: updateSupplierDto.licenseNo ?? updateSupplierDto.licenseNumber,
+    };
+    delete (data as any).licenseNumber;
+    const result = await this.suppliersRepository.update(id, data);
     await this.cache.del(`${this.cachePrefix}:${id}`);
     await this.invalidateListCache();
     return result;

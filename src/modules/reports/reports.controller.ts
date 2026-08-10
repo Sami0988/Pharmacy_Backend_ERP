@@ -22,12 +22,10 @@ export class ReportsController {
       return sendCsv(res, `${filename}.csv`, arrayToCsv(result.data, result.columns));
     }
     if (format === 'pdf') {
-      const html = this.pdfExportService.buildHtmlFromRows(
-        filename.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
-        result.columns.map((c: any) => c.header),
-        result.data.map((row: any) => result.columns.map((c: any) => String(row[c.key] ?? ''))),
-      );
-      const pdf = await this.pdfExportService.generatePdf(html);
+      const title = filename.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+      const headers = result.columns.map((c: any) => c.header);
+      const rows = result.data.map((row: any) => result.columns.map((c: any) => String(row[c.key] ?? '')));
+      const pdf = await this.pdfExportService.generatePdfFromData(title, headers, rows);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
       return res.send(pdf);
@@ -44,16 +42,26 @@ export class ReportsController {
   async getStock(
     @Query() pagination: PaginationQueryDto,
     @Query('format') format?: string,
+    @Query('search') search?: string,
     @Res({ passthrough: true }) res?: Response,
   ) {
     this.logger.debug(`[Reports] GET /reports/stock - page: ${pagination.page}, limit: ${pagination.limit}, format: ${format}`);
     const result = await this.reportsService.getStockReport(
       { page: pagination.page!, limit: pagination.limit! },
       format,
+      search,
     );
     this.logger.debug(`[Reports] GET /reports/stock - returned successfully`);
     if (format && res) return this.sendExport(res, 'stock-report', result, format);
     return result;
+  }
+
+  @Get('stock/batches')
+  @ApiOperation({ summary: 'Stock by batch for POS (Dispatcher location)' })
+  @ApiQuery({ name: 'itemId', required: false, description: 'Filter by item ID' })
+  @ApiResponse({ status: 200, description: 'List of batches with stock at Dispatcher' })
+  async getStockByBatch(@Query('itemId') itemId?: string) {
+    return this.reportsService.getStockByBatch(itemId);
   }
 
   @Get('expiry')

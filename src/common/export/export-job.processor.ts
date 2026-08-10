@@ -31,12 +31,12 @@ export class ExportJobProcessor extends WorkerHost {
       let fileUrl: string;
 
       if (format === 'pdf') {
-        const html = this.pdfExportService.buildHtmlFromRows(
-          `${type} Report`,
+        const title = `${type} Report`;
+        const pdfBuffer = await this.pdfExportService.generatePdfFromData(
+          title,
           result.columns,
           result.rows,
         );
-        const pdfBuffer = await this.pdfExportService.generatePdf(html);
         await this.minioService.uploadFile(
           'reports',
           `${fileName}.pdf`,

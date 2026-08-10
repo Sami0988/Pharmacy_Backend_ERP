@@ -10,8 +10,8 @@ export class ReportsService {
     private readonly supplierPaymentsService: SupplierPaymentsService,
   ) {}
 
-  async getStockReport(params: { page: number; limit: number }, format?: string): Promise<PaginatedResponse<any> | any> {
-    const result = await this.repository.getStockReport(params);
+  async getStockReport(params: { page: number; limit: number }, format?: string, search?: string): Promise<PaginatedResponse<any> | any> {
+    const result = await this.repository.getStockReport(params, search);
     if (format === 'csv') return { data: result.data, columns: [
       { key: 'itemName', header: 'Item' },
       { key: 'storeQuantity', header: 'Store Qty' },
@@ -99,5 +99,9 @@ export class ReportsService {
       { key: 'daysSinceLastSale', header: 'Days Since Last Sale' },
     ]};
     return result;
+  }
+
+  async getStockByBatch(itemId?: string) {
+    return this.repository.getStockByBatch(itemId);
   }
 }

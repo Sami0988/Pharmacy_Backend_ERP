@@ -132,7 +132,7 @@ export class HealthController {
     const rssMb = Math.round(mem.rss / 1024 / 1024);
     const heapUsageRatio = mem.heapUsed / mem.heapTotal;
 
-    if (heapUsageRatio > 0.9) {
+    if (heapUsageRatio > 0.95) {
       return {
         memory: {
           status: 'down',

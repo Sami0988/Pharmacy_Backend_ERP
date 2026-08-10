@@ -30,4 +30,8 @@ export class CreateSupplierDto {
   @IsString()
   @IsOptional()
   licenseNo?: string;
+
+  @IsString()
+  @IsOptional()
+  licenseNumber?: string;
 }

@@ -7,7 +7,7 @@ import { TransfersModule } from '../transfers/transfers.module';
 import { CustomersModule } from '../customers/customers.module';
 import { StorageModule } from '../../common/storage/storage.module';
 import { AuditLogUtil } from '../../common/utils/audit-log.util';
-import { ReceiptPdfModule } from '../../common/pdf/pdf.module';
+import { PdfModule } from '../../common/pdf/pdf.module';
 
 @Module({
   imports: [
@@ -15,7 +15,7 @@ import { ReceiptPdfModule } from '../../common/pdf/pdf.module';
     TransfersModule,
     CustomersModule,
     StorageModule,
-    ReceiptPdfModule,
+    PdfModule,
   ],
   controllers: [SalesController],
   providers: [SalesService, SalesRepository, AuditLogUtil],
