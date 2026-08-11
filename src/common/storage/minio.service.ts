@@ -1,41 +1,21 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Client as MinioClient } from 'minio';
+import { v2 as cloudinary } from 'cloudinary';
 
 @Injectable()
 export class MinioService implements OnModuleInit {
   private readonly logger = new Logger(MinioService.name);
-  private readonly client: MinioClient;
-  private readonly buckets = ['invoices', 'batch-qr-codes', 'receipts', 'reports', 'profile-images'];
 
   constructor(private readonly configService: ConfigService) {
-    this.client = new MinioClient({
-      endPoint: configService.get<string>('MINIO_ENDPOINT', 'localhost'),
-      port: configService.get<number>('MINIO_PORT', 9000),
-      useSSL: configService.get<string>('MINIO_USE_SSL', 'false') === 'true',
-      accessKey: configService.get<string>('MINIO_ACCESS_KEY', ''),
-      secretKey: configService.get<string>('MINIO_SECRET_KEY', ''),
+    cloudinary.config({
+      cloud_name: configService.get<string>('CLOUDINARY_CLOUD_NAME'),
+      api_key: configService.get<string>('CLOUDINARY_API_KEY'),
+      api_secret: configService.get<string>('CLOUDINARY_API_SECRET'),
     });
   }
 
   async onModuleInit() {
-    await this.ensureBuckets();
-  }
-
-  async ensureBuckets() {
-    for (const bucket of this.buckets) {
-      try {
-        const exists = await this.client.bucketExists(bucket);
-        if (!exists) {
-          await this.client.makeBucket(bucket);
-          this.logger.log(`Created bucket: ${bucket}`);
-        }
-      } catch (error) {
-        this.logger.error(
-          `Failed to ensure bucket ${bucket}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-    }
+    this.logger.log('Cloudinary storage initialized');
   }
 
   async uploadFile(
@@ -44,10 +24,29 @@ export class MinioService implements OnModuleInit {
     buffer: Buffer,
     contentType: string,
   ): Promise<string> {
-    await this.client.putObject(bucket, key, buffer, buffer.length, {
-      'Content-Type': contentType,
+    const folder = bucket;
+    const publicId = key.replace(/\.[^/.]+$/, '');
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          public_id: publicId,
+          resource_type: 'auto',
+          format: contentType.includes('pdf') ? 'pdf' : undefined,
+        },
+        (error, result) => {
+          if (error) {
+            this.logger.error(`Upload failed: ${error.message}`);
+            reject(error);
+          } else {
+            this.logger.log(`Uploaded: ${result?.public_id}`);
+            resolve(result?.public_id || key);
+          }
+        },
+      );
+      uploadStream.end(buffer);
     });
-    return key;
   }
 
   async getSignedUrl(
@@ -55,15 +54,36 @@ export class MinioService implements OnModuleInit {
     key: string,
     expirySeconds = 3600,
   ): Promise<string> {
-    return this.client.presignedGetObject(bucket, key, expirySeconds);
+    try {
+      const publicId = key.includes('/') ? key : `${bucket}/${key}`;
+      const url = cloudinary.url(publicId, {
+        secure: true,
+        sign_url: true,
+        expires_at: Math.floor(Date.now() / 1000) + expirySeconds,
+      });
+      return url;
+    } catch (error) {
+      this.logger.error(`Failed to generate signed URL: ${error instanceof Error ? error.message : String(error)}`);
+      return '';
+    }
   }
 
   async deleteFile(bucket: string, key: string): Promise<void> {
-    await this.client.removeObject(bucket, key);
+    try {
+      const publicId = key.includes('/') ? key : `${bucket}/${key}`;
+      await cloudinary.uploader.destroy(publicId);
+      this.logger.log(`Deleted: ${publicId}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete file: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async checkConnection(): Promise<void> {
-    // List buckets to verify connectivity — throws if MinIO is unreachable
-    await this.client.listBuckets();
+    try {
+      await cloudinary.api.ping();
+      this.logger.log('Cloudinary connection OK');
+    } catch (error) {
+      throw new Error(`Cloudinary connection failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }

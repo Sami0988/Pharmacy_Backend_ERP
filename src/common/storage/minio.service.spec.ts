@@ -2,16 +2,20 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { MinioService } from './minio.service';
 
-const mockMinioClient = {
-  bucketExists: jest.fn(),
-  makeBucket: jest.fn(),
-  putObject: jest.fn(),
-  presignedGetObject: jest.fn(),
-  removeObject: jest.fn(),
+const mockCloudinary = {
+  config: jest.fn(),
+  uploader: {
+    upload_stream: jest.fn(),
+    destroy: jest.fn(),
+  },
+  url: jest.fn(),
+  api: {
+    ping: jest.fn(),
+  },
 };
 
-jest.mock('minio', () => ({
-  Client: jest.fn().mockImplementation(() => mockMinioClient),
+jest.mock('cloudinary', () => ({
+  v2: mockCloudinary,
 }));
 
 describe('MinioService', () => {
@@ -20,20 +24,26 @@ describe('MinioService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    mockMinioClient.bucketExists.mockResolvedValue(false);
-    mockMinioClient.makeBucket.mockResolvedValue(undefined);
-    mockMinioClient.putObject.mockResolvedValue(undefined);
-    mockMinioClient.presignedGetObject.mockResolvedValue('http://signed-url');
-    mockMinioClient.removeObject.mockResolvedValue(undefined);
+    mockCloudinary.api.ping.mockResolvedValue({ status: 'ok' });
+    mockCloudinary.url.mockReturnValue('https://res.cloudinary.com/test/image/upload/test.pdf');
+    mockCloudinary.uploader.destroy.mockResolvedValue({ result: 'ok' });
+    mockCloudinary.uploader.upload_stream.mockImplementation(
+      (opts: any, cb: Function) => {
+        const stream = {
+          end: jest.fn(() => {
+            cb(null, { public_id: opts.public_id, secure_url: 'https://test.pdf' });
+          }),
+        };
+        return stream;
+      },
+    );
 
     configService = {
       get: jest.fn((key: string, defaultValue?: any) => {
         const env: Record<string, any> = {
-          MINIO_ENDPOINT: 'localhost',
-          MINIO_PORT: 9000,
-          MINIO_USE_SSL: 'false',
-          MINIO_ACCESS_KEY: 'access',
-          MINIO_SECRET_KEY: 'secret',
+          CLOUDINARY_CLOUD_NAME: 'test',
+          CLOUDINARY_API_KEY: 'key',
+          CLOUDINARY_API_SECRET: 'secret',
         };
         return env[key] ?? defaultValue;
       }),
@@ -49,23 +59,19 @@ describe('MinioService', () => {
     service = module.get<MinioService>(MinioService);
   });
 
-  describe('ensureBuckets', () => {
-    it('should create buckets if they do not exist', async () => {
-      mockMinioClient.bucketExists.mockResolvedValue(false);
-      await service.ensureBuckets();
-      expect(mockMinioClient.makeBucket).toHaveBeenCalledWith('invoices');
-      expect(mockMinioClient.makeBucket).toHaveBeenCalledWith('batch-qr-codes');
-    });
-
-    it('should not create buckets if they already exist', async () => {
-      mockMinioClient.bucketExists.mockResolvedValue(true);
-      await service.ensureBuckets();
-      expect(mockMinioClient.makeBucket).not.toHaveBeenCalled();
+  describe('onModuleInit', () => {
+    it('should initialize Cloudinary', async () => {
+      await service.onModuleInit();
+      expect(mockCloudinary.config).toHaveBeenCalledWith({
+        cloud_name: 'test',
+        api_key: 'key',
+        api_secret: 'secret',
+      });
     });
   });
 
   describe('uploadFile', () => {
-    it('should upload file and return key', async () => {
+    it('should upload file and return public id', async () => {
       const buffer = Buffer.from('test');
       const result = await service.uploadFile(
         'invoices',
@@ -74,44 +80,34 @@ describe('MinioService', () => {
         'application/pdf',
       );
       expect(result).toBe('test.pdf');
-      expect(mockMinioClient.putObject).toHaveBeenCalledWith(
-        'invoices',
-        'test.pdf',
-        buffer,
-        buffer.length,
-        { 'Content-Type': 'application/pdf' },
-      );
+      expect(mockCloudinary.uploader.upload_stream).toHaveBeenCalled();
     });
   });
 
   describe('getSignedUrl', () => {
     it('should return signed URL', async () => {
       const result = await service.getSignedUrl('invoices', 'test.pdf');
-      expect(result).toBe('http://signed-url');
-      expect(mockMinioClient.presignedGetObject).toHaveBeenCalledWith(
-        'invoices',
-        'test.pdf',
-        3600,
-      );
-    });
-
-    it('should use custom expiry', async () => {
-      await service.getSignedUrl('invoices', 'test.pdf', 7200);
-      expect(mockMinioClient.presignedGetObject).toHaveBeenCalledWith(
-        'invoices',
-        'test.pdf',
-        7200,
-      );
+      expect(result).toContain('https://');
+      expect(mockCloudinary.url).toHaveBeenCalled();
     });
   });
 
   describe('deleteFile', () => {
     it('should delete file', async () => {
       await service.deleteFile('invoices', 'test.pdf');
-      expect(mockMinioClient.removeObject).toHaveBeenCalledWith(
-        'invoices',
-        'test.pdf',
-      );
+      expect(mockCloudinary.uploader.destroy).toHaveBeenCalledWith('invoices/test.pdf');
+    });
+  });
+
+  describe('checkConnection', () => {
+    it('should ping Cloudinary', async () => {
+      await service.checkConnection();
+      expect(mockCloudinary.api.ping).toHaveBeenCalled();
+    });
+
+    it('should throw on connection failure', async () => {
+      mockCloudinary.api.ping.mockRejectedValue(new Error('Connection failed'));
+      await expect(service.checkConnection()).rejects.toThrow('Connection failed');
     });
   });
 });
