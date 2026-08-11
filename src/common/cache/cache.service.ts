@@ -17,6 +17,8 @@ export class CacheService implements OnModuleDestroy {
       this.client = new Redis({
         host,
         port,
+        password: this.configService.get<string>('REDIS_PASSWORD'),
+        tls: host.includes('upstash.io') ? {} : undefined,
         maxRetriesPerRequest: 3,
         retryStrategy(times: number) {
           if (times > 3) return null;

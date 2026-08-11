@@ -16,6 +16,10 @@ import { DatabaseModule } from '../db/database.module';
         connection: {
           host: configService.get<string>('REDIS_HOST', 'localhost'),
           port: configService.get<number>('REDIS_PORT', 6379),
+          password: configService.get<string>('REDIS_PASSWORD'),
+          tls: configService.get<string>('REDIS_HOST', 'localhost').includes('upstash.io')
+            ? {}
+            : undefined,
         },
       }),
     }),

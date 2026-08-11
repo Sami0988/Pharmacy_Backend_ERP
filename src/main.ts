@@ -39,18 +39,15 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin: any, callback: any) => {
-      console.log(`[CORS] Request origin: "${origin}" | Allowed: [${allowedOrigins.join(', ')}]`);
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        console.log(`[CORS] BLOCKED origin: "${origin}"`);
         callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true,
   });
 
-  // Swagger setup
   const config = new DocumentBuilder()
     .setTitle('Pharmacy ERP API')
     .setDescription(
@@ -81,9 +78,8 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  const port = configService.get<number>('PORT', 301);
+  const port = process.env.PORT || 301;
   await app.listen(port);
   logger.log(`Application running on port ${port}`);
-  logger.log(`Swagger docs available at http://localhost:${port}/docs`);
 }
 void bootstrap();
