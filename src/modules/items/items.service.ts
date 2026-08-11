@@ -19,13 +19,14 @@ export class ItemsService {
   async findAll(params: {
     search?: string;
     category?: string;
+    unit?: string;
     includeDeleted?: boolean;
     page: number;
     limit: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   }): Promise<PaginatedResponse<any>> {
-    const cacheKey = `${this.cachePrefix}:list:${params.search || ''}:${params.category || ''}:${params.includeDeleted}:${params.page}:${params.limit}:${params.sortBy || ''}:${params.sortOrder || ''}`;
+    const cacheKey = `${this.cachePrefix}:list:${params.search || ''}:${params.category || ''}:${params.unit || ''}:${params.includeDeleted}:${params.page}:${params.limit}:${params.sortBy || ''}:${params.sortOrder || ''}`;
     const cached = await this.cache.get<any>(cacheKey);
     if (cached) return cached;
 

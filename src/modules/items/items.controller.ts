@@ -35,6 +35,10 @@ class ItemsQueryDto extends PaginationQueryDto {
   category?: string;
 
   @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsOptional()
   @IsBooleanString()
   includeDeleted?: string;
 }
@@ -73,6 +77,11 @@ export class ItemsController {
     description: 'Filter by category',
   })
   @ApiQuery({
+    name: 'unit',
+    required: false,
+    description: 'Filter by unit',
+  })
+  @ApiQuery({
     name: 'includeDeleted',
     required: false,
     description: 'Include soft-deleted items (admin only)',
@@ -94,6 +103,7 @@ export class ItemsController {
     return this.itemsService.findAll({
       search: query.search,
       category: query.category,
+      unit: query.unit,
       includeDeleted: query.includeDeleted === 'true',
       page: query.page!,
       limit: query.limit!,

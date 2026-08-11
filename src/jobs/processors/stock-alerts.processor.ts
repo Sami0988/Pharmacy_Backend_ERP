@@ -316,7 +316,7 @@ export class StockAlertsProcessor extends WorkerHost {
       .select({
         batchId: batches.id,
         batchNo: batches.batchNo,
-        expiryDate: batches.expiryDate,
+        expiryDate: sql<string>`to_char(${batches.expiryDate}, 'YYYY-MM-DD')`,
         itemId: batches.itemId,
         itemName: items.name,
       })

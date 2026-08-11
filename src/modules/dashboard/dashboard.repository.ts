@@ -30,7 +30,7 @@ export class DashboardRepository {
         transactionCount: sql<number>`count(${sales.id})`,
       })
       .from(sales)
-      .where(sql`date(${sales.createdAt}) = ${today}`);
+      .where(sql`date(${sales.createdAt} AT TIME ZONE 'UTC') = ${today}`);
     return {
       totalAmount: parseFloat(result[0]?.totalAmount ?? '0'),
       transactionCount: Number(result[0]?.transactionCount ?? 0),
@@ -112,7 +112,7 @@ export class DashboardRepository {
  
     const salesRows = await this.databaseService.db
       .select({
-        month: sql<string>`to_char(date_trunc('month', ${sales.createdAt}), 'YYYY-MM')`,
+        month: sql<string>`to_char(date_trunc('month', ${sales.createdAt} AT TIME ZONE 'UTC'), 'YYYY-MM')`,
         revenue: sql<string>`coalesce(sum(${sales.totalAmount}), '0')`,
         profit: sql<string>`coalesce(sum(
           (cast(${saleItems.unitPrice} as decimal) - cast(${batches.unitCost} as decimal))
@@ -126,19 +126,19 @@ export class DashboardRepository {
       .from(sales)
       .innerJoin(saleItems, eq(saleItems.saleId, sales.id))
       .innerJoin(batches, eq(saleItems.batchId, batches.id))
-      .where(sql`date(${sales.createdAt}) >= ${startDate}`)
-      .groupBy(sql`date_trunc('month', ${sales.createdAt})`)
-      .orderBy(sql`date_trunc('month', ${sales.createdAt})`);
- 
+      .where(sql`date(${sales.createdAt} AT TIME ZONE 'UTC') >= ${startDate}`)
+      .groupBy(sql`date_trunc('month', ${sales.createdAt} AT TIME ZONE 'UTC')`)
+      .orderBy(sql`date_trunc('month', ${sales.createdAt} AT TIME ZONE 'UTC')`);
+  
     const expenseRows = await this.databaseService.db
       .select({
-        month: sql<string>`to_char(date_trunc('month', ${goodsReceipts.receiptDate}), 'YYYY-MM')`,
+        month: sql<string>`to_char(date_trunc('month', ${goodsReceipts.receiptDate} AT TIME ZONE 'UTC'), 'YYYY-MM')`,
         expenses: sql<string>`coalesce(sum(${goodsReceipts.totalCost}), '0')`,
       })
       .from(goodsReceipts)
-      .where(sql`date(${goodsReceipts.receiptDate}) >= ${startDate}`)
-      .groupBy(sql`date_trunc('month', ${goodsReceipts.receiptDate})`)
-      .orderBy(sql`date_trunc('month', ${goodsReceipts.receiptDate})`);
+      .where(sql`date(${goodsReceipts.receiptDate} AT TIME ZONE 'UTC') >= ${startDate}`)
+      .groupBy(sql`date_trunc('month', ${goodsReceipts.receiptDate} AT TIME ZONE 'UTC')`)
+      .orderBy(sql`date_trunc('month', ${goodsReceipts.receiptDate} AT TIME ZONE 'UTC')`);
  
     const combined = new Map<string, { month: string; revenue: number; profit: number; expenses: number; creditSales: number }>();
  
@@ -192,7 +192,7 @@ export class DashboardRepository {
  
     const salesRows = await this.databaseService.db
       .select({
-        day: sql<string>`to_char(date(${sales.createdAt}), 'YYYY-MM-DD')`,
+        day: sql<string>`to_char(date(${sales.createdAt} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`,
         totalSales: sql<string>`coalesce(sum(${sales.totalAmount}), '0')`,
         profit: sql<string>`coalesce(sum(
           (cast(${saleItems.unitPrice} as decimal) - cast(${batches.unitCost} as decimal))
@@ -206,48 +206,48 @@ export class DashboardRepository {
       .from(sales)
       .innerJoin(saleItems, eq(saleItems.saleId, sales.id))
       .innerJoin(batches, eq(saleItems.batchId, batches.id))
-      .where(sql`date(${sales.createdAt}) >= ${startDate}`)
-      .groupBy(sql`date(${sales.createdAt})`)
-      .orderBy(sql`date(${sales.createdAt})`);
- 
+      .where(sql`date(${sales.createdAt} AT TIME ZONE 'UTC') >= ${startDate}`)
+      .groupBy(sql`date(${sales.createdAt} AT TIME ZONE 'UTC')`)
+      .orderBy(sql`date(${sales.createdAt} AT TIME ZONE 'UTC')`);
+  
     const stockBefore = await this.databaseService.db
       .select({
         onHand: sql<string>`coalesce(sum(${stockMovements.quantity}), '0')`,
       })
       .from(stockMovements)
-      .where(sql`date(${stockMovements.createdAt}) < ${startDate}`);
+      .where(sql`date(${stockMovements.createdAt} AT TIME ZONE 'UTC') < ${startDate}`);
     const startingStock = Number(stockBefore[0]?.onHand ?? '0');
  
     const stockRows = await this.databaseService.db
       .select({
-        day: sql<string>`to_char(date(${stockMovements.createdAt}), 'YYYY-MM-DD')`,
+        day: sql<string>`to_char(date(${stockMovements.createdAt} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`,
         delta: sql<string>`coalesce(sum(${stockMovements.quantity}), '0')`,
       })
       .from(stockMovements)
-      .where(sql`date(${stockMovements.createdAt}) >= ${startDate}`)
-      .groupBy(sql`date(${stockMovements.createdAt})`)
-      .orderBy(sql`date(${stockMovements.createdAt})`);
+      .where(sql`date(${stockMovements.createdAt} AT TIME ZONE 'UTC') >= ${startDate}`)
+      .groupBy(sql`date(${stockMovements.createdAt} AT TIME ZONE 'UTC')`)
+      .orderBy(sql`date(${stockMovements.createdAt} AT TIME ZONE 'UTC')`);
  
     const notificationRows = await this.databaseService.db
       .select({
-        day: sql<string>`to_char(date(${notifications.createdAt}), 'YYYY-MM-DD')`,
+        day: sql<string>`to_char(date(${notifications.createdAt} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`,
         lowStock: sql<string>`coalesce(sum(case when ${notifications.type} = 'low_stock' then 1 else 0 end), '0')`,
         expiringSoon: sql<string>`coalesce(sum(case when ${notifications.type} = 'near_expiry' then 1 else 0 end), '0')`,
       })
       .from(notifications)
-      .where(sql`date(${notifications.createdAt}) >= ${startDate}`)
-      .groupBy(sql`date(${notifications.createdAt})`)
-      .orderBy(sql`date(${notifications.createdAt})`);
+      .where(sql`date(${notifications.createdAt} AT TIME ZONE 'UTC') >= ${startDate}`)
+      .groupBy(sql`date(${notifications.createdAt} AT TIME ZONE 'UTC')`)
+      .orderBy(sql`date(${notifications.createdAt} AT TIME ZONE 'UTC')`);
  
     const auditRows = await this.databaseService.db
       .select({
-        day: sql<string>`to_char(date(${auditLog.createdAt}), 'YYYY-MM-DD')`,
+        day: sql<string>`to_char(date(${auditLog.createdAt} AT TIME ZONE 'UTC'), 'YYYY-MM-DD')`,
         count: sql<string>`coalesce(count(${auditLog.id}), '0')`,
       })
       .from(auditLog)
-      .where(sql`date(${auditLog.createdAt}) >= ${startDate}`)
-      .groupBy(sql`date(${auditLog.createdAt})`)
-      .orderBy(sql`date(${auditLog.createdAt})`);
+      .where(sql`date(${auditLog.createdAt} AT TIME ZONE 'UTC') >= ${startDate}`)
+      .groupBy(sql`date(${auditLog.createdAt} AT TIME ZONE 'UTC')`)
+      .orderBy(sql`date(${auditLog.createdAt} AT TIME ZONE 'UTC')`);
  
     const salesMap = new Map(
       salesRows.map((row) => [row.day, {
@@ -296,7 +296,7 @@ export class DashboardRepository {
       .from(saleItems)
       .innerJoin(sales, eq(saleItems.saleId, sales.id))
       .innerJoin(batches, eq(saleItems.batchId, batches.id))
-      .where(sql`date(${sales.createdAt}) = ${today}`);
+      .where(sql`date(${sales.createdAt} AT TIME ZONE 'UTC') = ${today}`);
     return parseFloat(result[0]?.profit ?? '0');
   }
 
@@ -316,7 +316,7 @@ export class DashboardRepository {
       .innerJoin(sales, eq(saleItems.saleId, sales.id))
       .innerJoin(batches, eq(saleItems.batchId, batches.id))
       .innerJoin(items, eq(batches.itemId, items.id))
-      .where(sql`date(${sales.createdAt}) >= ${since}`)
+      .where(sql`date(${sales.createdAt} AT TIME ZONE 'UTC') >= ${since}`)
       .groupBy(items.id, items.name)
       .orderBy(desc(sql`sum(${saleItems.quantity})`))
       .limit(limit);
@@ -461,7 +461,7 @@ export class DashboardRepository {
 
   async getMostRecentSaleDate(itemId: string) {
     const result = await this.databaseService.db
-      .select({ lastSaleDate: sql<string>`max(date(${sales.createdAt}))` })
+        .select({ lastSaleDate: sql<string>`max(date(${sales.createdAt} AT TIME ZONE 'UTC'))` })
       .from(saleItems)
       .innerJoin(sales, eq(saleItems.saleId, sales.id))
       .innerJoin(batches, eq(saleItems.batchId, batches.id))

@@ -11,6 +11,7 @@ export class ItemsRepository {
   async findAll(params: {
     search?: string;
     category?: string;
+    unit?: string;
     includeDeleted?: boolean;
     page: number;
     limit: number;
@@ -31,6 +32,9 @@ export class ItemsRepository {
     }
     if (params.category) {
       conditions.push(eq(items.category, params.category));
+    }
+    if (params.unit) {
+      conditions.push(eq(items.unit, params.unit));
     }
 
     const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);

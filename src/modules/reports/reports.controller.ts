@@ -6,6 +6,7 @@ import { ReportsService } from './reports.service';
 import { PdfExportService } from '../../common/export/pdf-export.service';
 import { arrayToCsv, sendCsv } from '../../common/export/csv-export.util';
 import { PaginationQueryDto } from '../../common/pagination';
+import { SalesReportQueryDto, ExpiryReportQueryDto, DeadStockReportQueryDto } from './dto/report-query.dto';
 
 @ApiTags('Reports')
 @ApiBearerAuth('jwt-access')
@@ -72,16 +73,15 @@ export class ReportsController {
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page', type: Number })
   @ApiQuery({ name: 'format', required: false })
   async getExpiry(
-    @Query('withinDays') withinDays?: string,
-    @Query() pagination?: PaginationQueryDto,
+    @Query() query: ExpiryReportQueryDto,
     @Query('format') format?: string,
     @Res({ passthrough: true }) res?: Response,
   ) {
-    const days = withinDays ? parseInt(withinDays, 10) : 90;
+    const days = query.withinDays ? parseInt(query.withinDays, 10) : 90;
     const result = await this.reportsService.getExpiryReport(
       Number.isFinite(days) && days > 0 ? days : undefined,
       format,
-      pagination ? { page: pagination.page!, limit: pagination.limit! } : undefined,
+      { page: query.page!, limit: query.limit! },
     );
     if (format && res) return this.sendExport(res, 'expiry-report', result, format);
     return result;
@@ -96,17 +96,15 @@ export class ReportsController {
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page', type: Number })
   @ApiQuery({ name: 'format', required: false })
   async getSales(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query() pagination?: PaginationQueryDto,
+    @Query() query: SalesReportQueryDto,
     @Query('format') format?: string,
     @Res({ passthrough: true }) res?: Response,
   ) {
     const result = await this.reportsService.getSalesReport(
-      startDate,
-      endDate,
+      query.startDate,
+      query.endDate,
       format,
-      pagination ? { page: pagination.page!, limit: pagination.limit! } : undefined,
+      { page: query.page!, limit: query.limit! },
     );
     if (format && res) return this.sendExport(res, 'sales-report', result, format);
     return result;
@@ -130,16 +128,15 @@ export class ReportsController {
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page', type: Number })
   @ApiQuery({ name: 'format', required: false })
   async getDeadStock(
-    @Query('daysThreshold') daysThreshold?: string,
-    @Query() pagination?: PaginationQueryDto,
+    @Query() query: DeadStockReportQueryDto,
     @Query('format') format?: string,
     @Res({ passthrough: true }) res?: Response,
   ) {
-    const days = daysThreshold ? parseInt(daysThreshold, 10) : 60;
+    const days = query.daysThreshold ? parseInt(query.daysThreshold, 10) : 60;
     const result = await this.reportsService.getDeadStockReport(
       Number.isFinite(days) && days > 0 ? days : undefined,
       format,
-      pagination ? { page: pagination.page!, limit: pagination.limit! } : undefined,
+      { page: query.page!, limit: query.limit! },
     );
     if (format && res) return this.sendExport(res, 'dead-stock-report', result, format);
     return result;
