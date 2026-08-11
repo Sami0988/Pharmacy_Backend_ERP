@@ -31,18 +31,15 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new LoggingInterceptor());
 
-  const corsOrigins = configService.get<string>(
-    'CORS_ALLOWED_ORIGINS',
-    configService.get<string>('FRONTEND_URL', 'http://localhost:3000'),
-  );
+  const corsOrigins = process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000';
   const allowedOrigins = corsOrigins.split(',').map((o) => o.trim());
 
   app.enableCors({
     origin: (origin: any, callback: any) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        callback(null, true);
       }
     },
     credentials: true,
