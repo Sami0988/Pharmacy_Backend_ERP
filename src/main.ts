@@ -33,7 +33,7 @@ async function bootstrap() {
 
   const corsOrigins = configService.get<string>(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000',
+    configService.get<string>('FRONTEND_URL', 'http://localhost:3000'),
   );
   const allowedOrigins = corsOrigins.split(',').map((o) => o.trim());
 
