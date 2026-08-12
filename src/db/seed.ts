@@ -7,6 +7,40 @@ const DATABASE_URL =
   process.env.DATABASE_URL ||
   'postgres://postgres:devpassword@localhost:5433/pharmacy_erp';
 
+// ─── Explicit valid UUIDs (v4 format) ────────────────────────────────
+// All UUIDs below have correct version (4) and variant (8-b) bits
+// so they pass @IsUUID() validation in class-validator.
+const IDS = {
+  branch:        'b0000000-0000-4000-8000-000000000001',
+  store:         'b0000000-0000-4000-8000-000000000002',
+  dispatcher:    'b0000000-0000-4000-8000-000000000003',
+  admin:         'c0000000-0000-4000-8000-000000000001',
+  keeper:        'c0000000-0000-4000-8000-000000000002',
+  cashier:       'c0000000-0000-4000-8000-000000000003',
+  items: Array.from({ length: 20 }, (_, i) =>
+    `d0000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+  customers: Array.from({ length: 10 }, (_, i) =>
+    `e0000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+  suppliers: Array.from({ length: 4 }, (_, i) =>
+    `f0000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+  grns: Array.from({ length: 6 }, (_, i) =>
+    `a1000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+  batches: Array.from({ length: 22 }, (_, i) =>
+    `a2000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+  stockMovements: Array.from({ length: 60 }, (_, i) =>
+    `a3000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+  transfers: Array.from({ length: 11 }, (_, i) =>
+    `a4000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+  sales: Array.from({ length: 8 }, (_, i) =>
+    `a5000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+  saleItems: Array.from({ length: 15 }, (_, i) =>
+    `a6000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+  payments: Array.from({ length: 4 }, (_, i) =>
+    `a7000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+  notifications: Array.from({ length: 8 }, (_, i) =>
+    `a8000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
+};
+
 async function seed() {
   const pool = new Pool({ connectionString: DATABASE_URL });
   const db = drizzle(pool, { schema });
@@ -21,28 +55,29 @@ async function seed() {
   // ─── 1. Branch ─────────────────────────────────────────────────
   const [branch] = await db
     .insert(schema.branches)
-    .values({ name: 'Main Branch', address: 'Bole Road, Addis Ababa' })
+    .values({ id: IDS.branch, name: 'Main Branch', address: 'Bole Road, Addis Ababa' })
     .returning();
-  console.log(`  Created branch: ${branch.name}`);
+  console.log(`  Created branch: ${branch.name} (${branch.id})`);
 
   // ─── 2. Locations ──────────────────────────────────────────────
-  const [store] = await db.insert(schema.locations).values({ branchId: branch.id, name: 'Store' }).returning();
-  const [dispatcher] = await db.insert(schema.locations).values({ branchId: branch.id, name: 'Dispatcher' }).returning();
+  const [store] = await db.insert(schema.locations).values({ id: IDS.store, branchId: branch.id, name: 'Store' }).returning();
+  const [dispatcher] = await db.insert(schema.locations).values({ id: IDS.dispatcher, branchId: branch.id, name: 'Dispatcher' }).returning();
   console.log('  Created 2 locations (Store + Dispatcher)');
 
   // ─── 3. Users ──────────────────────────────────────────────────
-  const hashedPassword = await bcrypt.hash('admin123', 10);
+  const hashedPassword = await bcrypt.hash('Sami@123', 10);
+  const hashedPasswordDev = await bcrypt.hash('admin123', 10);
   const [admin] = await db
     .insert(schema.users)
-    .values({ name: 'Admin User', email: 'admin@pharmacy.local', passwordHash: hashedPassword, role: 'admin', branchId: branch.id })
+    .values({ id: IDS.admin, name: 'Admin User', email: 'samuasami84@gmail.com', passwordHash: hashedPassword, role: 'admin', branchId: branch.id })
     .returning();
   const [keeper] = await db
     .insert(schema.users)
-    .values({ name: 'Abebe Kebede', email: 'abebe@pharmacy.local', passwordHash: hashedPassword, role: 'store_keeper', branchId: branch.id })
+    .values({ id: IDS.keeper, name: 'Abebe Kebede', email: 'abebe@pharmacy.local', passwordHash: hashedPasswordDev, role: 'store_keeper', branchId: branch.id })
     .returning();
   const [cashier] = await db
     .insert(schema.users)
-    .values({ name: 'Hana Tesfaye', email: 'hana@pharmacy.local', passwordHash: hashedPassword, role: 'cashier', branchId: branch.id })
+    .values({ id: IDS.cashier, name: 'Hana Tesfaye', email: 'hana@pharmacy.local', passwordHash: hashedPasswordDev, role: 'cashier', branchId: branch.id })
     .returning();
   console.log('  Created users: admin, store_keeper, cashier');
 
@@ -71,8 +106,8 @@ async function seed() {
   ];
 
   const createdItems: any[] = [];
-  for (const item of itemsData) {
-    const [created] = await db.insert(schema.items).values(item).returning();
+  for (let i = 0; i < itemsData.length; i++) {
+    const [created] = await db.insert(schema.items).values({ id: IDS.items[i], ...itemsData[i] }).returning();
     createdItems.push(created);
   }
   console.log(`  Created ${createdItems.length} items`);
@@ -92,8 +127,8 @@ async function seed() {
   ];
 
   const createdCustomers: any[] = [];
-  for (const c of customersData) {
-    const [created] = await db.insert(schema.customers).values(c).returning();
+  for (let i = 0; i < customersData.length; i++) {
+    const [created] = await db.insert(schema.customers).values({ id: IDS.customers[i], ...customersData[i] }).returning();
     createdCustomers.push(created);
   }
   console.log(`  Created ${createdCustomers.length} customers`);
@@ -107,34 +142,40 @@ async function seed() {
   ];
 
   const createdSuppliers: any[] = [];
-  for (const s of suppliersData) {
-    const [created] = await db.insert(schema.suppliers).values(s).returning();
+  for (let i = 0; i < suppliersData.length; i++) {
+    const [created] = await db.insert(schema.suppliers).values({ id: IDS.suppliers[i], ...suppliersData[i] }).returning();
     createdSuppliers.push(created);
   }
   console.log(`  Created ${createdSuppliers.length} suppliers`);
 
   // ─── 7. Goods Receipts (6 GRNs) ───────────────────────────────
   const grn1 = await db.insert(schema.goodsReceipts).values({
+    id: IDS.grns[0],
     supplierId: createdSuppliers[0].id, branchId: branch.id,
     grnNumber: 'GRN-2026-001', receiptDate: '2026-01-15', totalCost: '25000.00', paymentDueDate: '2026-02-15', createdBy: keeper.id,
   }).returning();
   const grn2 = await db.insert(schema.goodsReceipts).values({
+    id: IDS.grns[1],
     supplierId: createdSuppliers[1].id, branchId: branch.id,
     grnNumber: 'GRN-2026-002', receiptDate: '2026-02-20', totalCost: '18500.00', paymentDueDate: '2026-03-20', createdBy: keeper.id,
   }).returning();
   const grn3 = await db.insert(schema.goodsReceipts).values({
+    id: IDS.grns[2],
     supplierId: createdSuppliers[2].id, branchId: branch.id,
     grnNumber: 'GRN-2026-003', receiptDate: '2026-03-10', totalCost: '32000.00', paymentDueDate: '2026-04-10', createdBy: keeper.id,
   }).returning();
   const grn4 = await db.insert(schema.goodsReceipts).values({
+    id: IDS.grns[3],
     supplierId: createdSuppliers[3].id, branchId: branch.id,
     grnNumber: 'GRN-2026-004', receiptDate: '2026-04-05', totalCost: '15000.00', paymentDueDate: '2026-05-05', createdBy: keeper.id,
   }).returning();
   const grn5 = await db.insert(schema.goodsReceipts).values({
+    id: IDS.grns[4],
     supplierId: createdSuppliers[0].id, branchId: branch.id,
     grnNumber: 'GRN-2026-005', receiptDate: '2026-06-01', totalCost: '22000.00', paymentDueDate: '2026-07-01', createdBy: keeper.id,
   }).returning();
   const grn6 = await db.insert(schema.goodsReceipts).values({
+    id: IDS.grns[5],
     supplierId: createdSuppliers[1].id, branchId: branch.id,
     grnNumber: 'GRN-2026-006', receiptDate: '2026-08-01', totalCost: '31000.00', paymentDueDate: '2026-09-01', createdBy: keeper.id,
   }).returning();
@@ -144,62 +185,44 @@ async function seed() {
 
   // ─── 8. Batches (22 batches with varied expiry dates) ──────────
   const batchesData = [
-    // Paracetamol - multiple batches
     { itemId: createdItems[0].id, grnId: grn1[0].id, batchNo: 'BAT-PAR-001', expiryDate: '2028-01-31', unitCost: '12.00', sellingPrice: '18.00', quantityReceived: 500 },
     { itemId: createdItems[0].id, grnId: grn5[0].id, batchNo: 'BAT-PAR-002', expiryDate: '2027-06-30', unitCost: '13.50', sellingPrice: '20.00', quantityReceived: 300 },
     { itemId: createdItems[0].id, grnId: grn6[0].id, batchNo: 'BAT-PAR-003', expiryDate: '2026-09-30', unitCost: '11.00', sellingPrice: '16.00', quantityReceived: 100 },
-    // Amoxicillin
     { itemId: createdItems[1].id, grnId: grn2[0].id, batchNo: 'BAT-AMX-001', expiryDate: '2027-08-15', unitCost: '22.00', sellingPrice: '35.00', quantityReceived: 200 },
     { itemId: createdItems[1].id, grnId: grn6[0].id, batchNo: 'BAT-AMX-002', expiryDate: '2026-12-31', unitCost: '24.00', sellingPrice: '38.00', quantityReceived: 150 },
-    // Metformin
     { itemId: createdItems[2].id, grnId: grn3[0].id, batchNo: 'BAT-MET-001', expiryDate: '2027-10-01', unitCost: '18.00', sellingPrice: '28.00', quantityReceived: 400 },
-    // Amlodipine
     { itemId: createdItems[3].id, grnId: grn1[0].id, batchNo: 'BAT-AML-001', expiryDate: '2028-03-15', unitCost: '20.00', sellingPrice: '32.00', quantityReceived: 250 },
-    // Omeprazole
     { itemId: createdItems[4].id, grnId: grn4[0].id, batchNo: 'BAT-OME-001', expiryDate: '2027-05-20', unitCost: '28.00', sellingPrice: '45.00', quantityReceived: 180 },
-    // Ciprofloxacin
     { itemId: createdItems[5].id, grnId: grn3[0].id, batchNo: 'BAT-CIP-001', expiryDate: '2027-09-30', unitCost: '30.00', sellingPrice: '48.00', quantityReceived: 200 },
-    // Ibuprofen
     { itemId: createdItems[6].id, grnId: grn5[0].id, batchNo: 'BAT-IBU-001', expiryDate: '2028-02-28', unitCost: '10.00', sellingPrice: '15.00', quantityReceived: 600 },
-    // Cetirizine
     { itemId: createdItems[7].id, grnId: grn2[0].id, batchNo: 'BAT-CET-001', expiryDate: '2027-07-01', unitCost: '15.00', sellingPrice: '24.00', quantityReceived: 300 },
-    // Azithromycin
     { itemId: createdItems[8].id, grnId: grn5[0].id, batchNo: 'BAT-AZI-001', expiryDate: '2027-11-15', unitCost: '40.00', sellingPrice: '65.00', quantityReceived: 120 },
-    // ACT (Artemether-Lumefantrine)
     { itemId: createdItems[9].id, grnId: grn6[0].id, batchNo: 'BAT-ACT-001', expiryDate: '2027-04-30', unitCost: '65.00', sellingPrice: '100.00', quantityReceived: 100 },
-    // Metronidazole
     { itemId: createdItems[10].id, grnId: grn3[0].id, batchNo: 'BAT-METRO-001', expiryDate: '2028-01-15', unitCost: '12.00', sellingPrice: '19.00', quantityReceived: 350 },
-    // Salbutamol
     { itemId: createdItems[11].id, grnId: grn4[0].id, batchNo: 'BAT-SAL-001', expiryDate: '2027-12-01', unitCost: '130.00', sellingPrice: '200.00', quantityReceived: 40 },
-    // Dexamethasone
     { itemId: createdItems[12].id, grnId: grn1[0].id, batchNo: 'BAT-DEX-001', expiryDate: '2027-08-20', unitCost: '8.00', sellingPrice: '12.00', quantityReceived: 200 },
-    // Tramadol (controlled)
     { itemId: createdItems[13].id, grnId: grn2[0].id, batchNo: 'BAT-TRA-001', expiryDate: '2027-06-15', unitCost: '18.00', sellingPrice: '28.00', quantityReceived: 80 },
-    // Diazepam (controlled)
     { itemId: createdItems[14].id, grnId: grn6[0].id, batchNo: 'BAT-DIA-001', expiryDate: '2028-04-30', unitCost: '10.00', sellingPrice: '16.00', quantityReceived: 60 },
-    // Pantoprazole
     { itemId: createdItems[15].id, grnId: grn5[0].id, batchNo: 'BAT-PAN-001', expiryDate: '2027-09-10', unitCost: '35.00', sellingPrice: '55.00', quantityReceived: 150 },
-    // Losartan
     { itemId: createdItems[16].id, grnId: grn3[0].id, batchNo: 'BAT-LOS-001', expiryDate: '2028-05-20', unitCost: '25.00', sellingPrice: '40.00', quantityReceived: 200 },
-    // Cephalexin
     { itemId: createdItems[17].id, grnId: grn4[0].id, batchNo: 'BAT-CEP-001', expiryDate: '2027-03-25', unitCost: '35.00', sellingPrice: '55.00', quantityReceived: 100 },
-    // ORS Sachets
     { itemId: createdItems[18].id, grnId: grn1[0].id, batchNo: 'BAT-ORS-001', expiryDate: '2028-06-30', unitCost: '5.00', sellingPrice: '8.00', quantityReceived: 1000 },
-    // Vitamin C
     { itemId: createdItems[19].id, grnId: grn4[0].id, batchNo: 'BAT-VTC-001', expiryDate: '2027-12-31', unitCost: '8.00', sellingPrice: '12.00', quantityReceived: 400 },
   ];
 
   const createdBatches: any[] = [];
-  for (const b of batchesData) {
-    const [created] = await db.insert(schema.batches).values(b).returning();
+  for (let i = 0; i < batchesData.length; i++) {
+    const [created] = await db.insert(schema.batches).values({ id: IDS.batches[i], ...batchesData[i] }).returning();
     createdBatches.push(created);
   }
   console.log(`  Created ${createdBatches.length} batches`);
 
   // ─── 9. Stock Movements (receipts into Store) ──────────────────
   const receiptMovements: any[] = [];
-  for (const batch of createdBatches) {
+  for (let i = 0; i < createdBatches.length; i++) {
+    const batch = createdBatches[i];
     const [mov] = await db.insert(schema.stockMovements).values({
+      id: IDS.stockMovements[i],
       batchId: batch.id, locationId: store.id, type: 'receipt',
       quantity: batch.quantityReceived, refId: batch.grnId, refType: 'goods_receipt', createdBy: keeper.id,
     }).returning();
@@ -209,33 +232,38 @@ async function seed() {
 
   // ─── 10. Transfers (Store -> Dispatcher) ────────────────────────
   const transferData = [
-    { batchIdx: 0, quantity: 80 },    // Paracetamol batch 1
-    { batchIdx: 1, quantity: 50 },    // Paracetamol batch 2
-    { batchIdx: 3, quantity: 40 },    // Amoxicillin
-    { batchIdx: 6, quantity: 30 },    // Amlodipine
-    { batchIdx: 8, quantity: 100 },   // Ibuprofen
-    { batchIdx: 10, quantity: 50 },   // Cetirizine
-    { batchIdx: 11, quantity: 25 },   // Azithromycin
-    { batchIdx: 13, quantity: 40 },   // Metronidazole
-    { batchIdx: 16, quantity: 20 },   // Tramadol
-    { batchIdx: 17, quantity: 15 },   // Diazepam
-    { batchIdx: 20, quantity: 150 },  // ORS
+    { batchIdx: 0, quantity: 80 },
+    { batchIdx: 1, quantity: 50 },
+    { batchIdx: 3, quantity: 40 },
+    { batchIdx: 6, quantity: 30 },
+    { batchIdx: 8, quantity: 100 },
+    { batchIdx: 10, quantity: 50 },
+    { batchIdx: 11, quantity: 25 },
+    { batchIdx: 13, quantity: 40 },
+    { batchIdx: 16, quantity: 20 },
+    { batchIdx: 17, quantity: 15 },
+    { batchIdx: 20, quantity: 150 },
   ];
 
+  let smIdx = createdBatches.length;
   const createdTransfers: any[] = [];
-  for (const t of transferData) {
+  for (let i = 0; i < transferData.length; i++) {
+    const t = transferData[i];
     const batch = createdBatches[t.batchIdx];
     const [transfer] = await db.insert(schema.transfers).values({
+      id: IDS.transfers[i],
       batchId: batch.id, quantity: t.quantity,
       fromLocationId: store.id, toLocationId: dispatcher.id, transferredBy: keeper.id,
     }).returning();
     createdTransfers.push(transfer);
 
     await db.insert(schema.stockMovements).values({
+      id: IDS.stockMovements[smIdx++],
       batchId: batch.id, locationId: store.id, type: 'transfer_out',
       quantity: -t.quantity, refId: transfer.id, refType: 'transfer', createdBy: keeper.id,
     });
     await db.insert(schema.stockMovements).values({
+      id: IDS.stockMovements[smIdx++],
       batchId: batch.id, locationId: dispatcher.id, type: 'transfer_in',
       quantity: t.quantity, refId: transfer.id, refType: 'transfer', createdBy: keeper.id,
     });
@@ -308,9 +336,12 @@ async function seed() {
     },
   ];
 
+  let siIdx = 0;
   const createdSales: any[] = [];
-  for (const s of salesData) {
+  for (let i = 0; i < salesData.length; i++) {
+    const s = salesData[i];
     const [sale] = await db.insert(schema.sales).values({
+      id: IDS.sales[i],
       branchId: branch.id, customerId: s.customerId, soldBy: cashier.id,
       totalAmount: s.totalAmount, paymentMethod: s.paymentMethod,
     }).returning();
@@ -319,11 +350,13 @@ async function seed() {
     for (const item of s.items) {
       const batch = createdBatches[item.batchIdx];
       await db.insert(schema.saleItems).values({
+        id: IDS.saleItems[siIdx++],
         saleId: sale.id, batchId: batch.id,
         quantity: item.quantity, unitPrice: item.unitPrice,
       });
 
       await db.insert(schema.stockMovements).values({
+        id: IDS.stockMovements[smIdx++],
         batchId: batch.id, locationId: dispatcher.id, type: 'sale',
         quantity: -item.quantity, refId: sale.id, refType: 'sale', createdBy: cashier.id,
       });
@@ -339,8 +372,8 @@ async function seed() {
     { supplierId: createdSuppliers[3].id, grnId: grn4[0].id, amountPaid: '15000.00', paymentDate: '2026-05-01', method: 'bank_transfer', notes: 'Full payment GRN-004' },
   ];
 
-  for (const p of paymentsData) {
-    await db.insert(schema.supplierPayments).values(p);
+  for (let i = 0; i < paymentsData.length; i++) {
+    await db.insert(schema.supplierPayments).values({ id: IDS.payments[i], ...paymentsData[i] });
   }
   console.log('  Created 4 supplier payments');
 
@@ -356,8 +389,8 @@ async function seed() {
     { type: 'low_stock' as const, title: 'Low Stock Alert', message: 'Azithromycin 250mg is below reorder level at Dispatcher', itemId: createdItems[8].id },
   ];
 
-  for (const n of notificationsData) {
-    await db.insert(schema.notifications).values(n);
+  for (let i = 0; i < notificationsData.length; i++) {
+    await db.insert(schema.notifications).values({ id: IDS.notifications[i], ...notificationsData[i] });
   }
   console.log('  Created 8 notifications');
 
@@ -365,10 +398,18 @@ async function seed() {
   console.log('\n========================================');
   console.log('  Seed completed successfully!');
   console.log('========================================');
-  console.log('\nDev credentials:');
-  console.log('  Email:    admin@pharmacy.local');
-  console.log('  Password: admin123');
-  console.log('\nAll users share the same password: admin123');
+  console.log('\nAdmin credentials:');
+  console.log('  Email:    samuasami84@gmail.com');
+  console.log('  Password: Sami@123');
+  console.log('\nOther users share the same password: Sami@123');
+  console.log('\nFixed UUIDs for API testing:');
+  console.log(`  Branch:     ${IDS.branch}`);
+  console.log(`  Store:      ${IDS.store}`);
+  console.log(`  Dispatcher: ${IDS.dispatcher}`);
+  console.log(`  Admin:      ${IDS.admin}`);
+  console.log(`  Cashier:    ${IDS.cashier}`);
+  console.log(`  Items:      ${IDS.items[0]} .. ${IDS.items[19]}`);
+  console.log(`  Batches:    ${IDS.batches[0]} .. ${IDS.batches[21]}`);
   console.log(`\nSummary:`);
   console.log(`  Branch:        1 (Main Branch)`);
   console.log(`  Locations:     2 (Store + Dispatcher)`);

@@ -152,10 +152,20 @@ export class SalesRepository {
       conditions.push(eq(sales.branchId, params.branchId));
     }
     if (params.customerId) {
-      conditions.push(eq(sales.customerId, params.customerId));
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.customerId);
+      if (isUuid) {
+        conditions.push(eq(sales.customerId, params.customerId));
+      } else {
+        conditions.push(sql`${customers.name} ILIKE ${`%${params.customerId}%`}`);
+      }
     }
     if (params.soldBy) {
-      conditions.push(eq(sales.soldBy, params.soldBy));
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.soldBy);
+      if (isUuid) {
+        conditions.push(eq(sales.soldBy, params.soldBy));
+      } else {
+        conditions.push(sql`${users.name} ILIKE ${`%${params.soldBy}%`}`);
+      }
     }
     if (params.fromDate) {
       conditions.push(gte(sales.createdAt, new Date(params.fromDate)));
