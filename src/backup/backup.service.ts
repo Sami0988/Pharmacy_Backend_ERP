@@ -171,14 +171,17 @@ export class BackupService {
     const metadata = { name: fileName, parents: this.driveFolderId ? [this.driveFolderId] : [] };
     const boundary = '----BackupBoundary' + Date.now();
 
-    let body = '';
-    body += `--${boundary}\r\n`;
-    body += `Content-Type: application/json; charset=UTF-8\r\n\r\n`;
-    body += JSON.stringify(metadata) + '\r\n';
-    body += `--${boundary}\r\n`;
-    body += `Content-Type: application/sql\r\n\r\n`;
-    body += fileContent.toString() + '\r\n';
-    body += `--${boundary}--`;
+    const jsonPart = Buffer.from(JSON.stringify(metadata));
+    const filePart = fileContent;
+
+    const parts: Buffer[] = [];
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`));
+    parts.push(jsonPart);
+    parts.push(Buffer.from(`\r\n--${boundary}\r\nContent-Type: application/sql\r\n\r\n`));
+    parts.push(filePart);
+    parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+    const body = Buffer.concat(parts);
 
     const res = await fetch(
       'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
@@ -188,7 +191,7 @@ export class BackupService {
           Authorization: `Bearer ${token}`,
           'Content-Type': `multipart/related; boundary=${boundary}`,
         },
-        body,
+        body: body as any,
       },
     );
 
