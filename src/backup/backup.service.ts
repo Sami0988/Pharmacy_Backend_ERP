@@ -11,7 +11,7 @@ export class BackupService {
 
   private readonly connectionString = process.env.DATABASE_URL;
   private readonly driveFolderId = process.env.GOOGLE_DRIVE_BACKUP_FOLDER_ID;
-  private readonly retentionDays = 730;
+  private readonly retentionDays = 1825;
 
   private readonly clientId = process.env.GOOGLE_OAUTH_CLIENT_ID!;
   private readonly clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET!;
@@ -222,8 +222,8 @@ export class BackupService {
   private async deleteOldBackups(): Promise<void> {
     const token = await this.getAccessToken();
     const now = new Date();
-    const twoYearsAgo = new Date(now);
-    twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+    const fiveYearsAgo = new Date(now);
+    fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
     const oneYearAgo = new Date(now);
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
@@ -246,8 +246,8 @@ export class BackupService {
       if (!file.createdTime) continue;
       const fileDate = new Date(file.createdTime);
 
-      if (fileDate < twoYearsAgo) {
-        this.logger.log(`Deleting backup older than 2 years: ${file.name}`);
+      if (fileDate < fiveYearsAgo) {
+        this.logger.log(`Deleting backup older than 5 years: ${file.name}`);
         await this.deleteFile(file.id, token);
         continue;
       }
@@ -255,7 +255,7 @@ export class BackupService {
       if (fileDate < oneYearAgo) {
         const dayOfWeek = fileDate.getDay();
         if (dayOfWeek !== 1) {
-          this.logger.log(`Deleting non-weekly backup between 1-2 years: ${file.name}`);
+          this.logger.log(`Deleting non-weekly backup between 1-5 years: ${file.name}`);
           await this.deleteFile(file.id, token);
         }
       }
