@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as zlib from 'zlib';
 import { Client } from 'pg';
 
 @Injectable()
@@ -10,7 +11,7 @@ export class BackupService {
 
   private readonly connectionString = process.env.DATABASE_URL;
   private readonly driveFolderId = process.env.GOOGLE_DRIVE_BACKUP_FOLDER_ID;
-  private readonly retentionDays = 1825;
+  private readonly retentionDays = 730;
 
   private readonly clientId = process.env.GOOGLE_OAUTH_CLIENT_ID!;
   private readonly clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET!;
@@ -103,7 +104,7 @@ export class BackupService {
 
   private async dumpDatabase(): Promise<string> {
     const dateStamp = new Date().toISOString().slice(0, 10);
-    const fileName = `pharmacy-backup-${dateStamp}.sql`;
+    const fileName = `pharmacy-backup-${dateStamp}.sql.gz`;
     const filePath = path.join(os.tmpdir(), fileName);
 
     this.logger.log(`Starting database backup -> ${filePath}`);
@@ -167,8 +168,9 @@ export class BackupService {
         }
       }
 
-      fs.writeFileSync(filePath, sql);
-      this.logger.log(`Backup written: ${filePath} (${(fs.statSync(filePath).size / 1024 / 1024).toFixed(2)} MB)`);
+      const compressed = zlib.gzipSync(Buffer.from(sql, 'utf-8'));
+      fs.writeFileSync(filePath, compressed);
+      this.logger.log(`Backup written: ${filePath} (${(compressed.length / 1024 / 1024).toFixed(2)} MB compressed)`);
       return filePath;
     } finally {
       await client.end();
@@ -191,7 +193,7 @@ export class BackupService {
     const parts: Buffer[] = [];
     parts.push(Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`));
     parts.push(jsonPart);
-    parts.push(Buffer.from(`\r\n--${boundary}\r\nContent-Type: application/sql\r\n\r\n`));
+    parts.push(Buffer.from(`\r\n--${boundary}\r\nContent-Type: application/gzip\r\n\r\n`));
     parts.push(filePart);
     parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
 
@@ -219,11 +221,14 @@ export class BackupService {
 
   private async deleteOldBackups(): Promise<void> {
     const token = await this.getAccessToken();
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - this.retentionDays);
+    const now = new Date();
+    const twoYearsAgo = new Date(now);
+    twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+    const oneYearAgo = new Date(now);
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
     const q = `'${this.driveFolderId}' in parents and name contains 'pharmacy-backup-' and trashed = false`;
-    const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,createdTime)`;
+    const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,createdTime)&orderBy=createdTime`;
 
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
@@ -238,13 +243,29 @@ export class BackupService {
     const files = data.files || [];
 
     for (const file of files) {
-      if (file.createdTime && new Date(file.createdTime) < cutoff) {
-        this.logger.log(`Deleting old backup from Drive: ${file.name}`);
-        await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      if (!file.createdTime) continue;
+      const fileDate = new Date(file.createdTime);
+
+      if (fileDate < twoYearsAgo) {
+        this.logger.log(`Deleting backup older than 2 years: ${file.name}`);
+        await this.deleteFile(file.id, token);
+        continue;
+      }
+
+      if (fileDate < oneYearAgo) {
+        const dayOfWeek = fileDate.getDay();
+        if (dayOfWeek !== 1) {
+          this.logger.log(`Deleting non-weekly backup between 1-2 years: ${file.name}`);
+          await this.deleteFile(file.id, token);
+        }
       }
     }
+  }
+
+  private async deleteFile(fileId: string, token: string): Promise<void> {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
   }
 }
