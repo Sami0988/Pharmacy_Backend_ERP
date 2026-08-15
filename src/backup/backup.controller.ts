@@ -13,7 +13,12 @@ export class BackupController {
   @Post('run')
   async triggerBackup() {
     this.logger.log('Manual backup triggered');
-    await this.backupService.runBackup();
-    return { message: 'Backup completed successfully' };
+    try {
+      await this.backupService.runBackup();
+      return { message: 'Backup completed successfully' };
+    } catch (error) {
+      this.logger.error('Backup failed', error);
+      return { message: 'Backup failed', error: error.message };
+    }
   }
 }
