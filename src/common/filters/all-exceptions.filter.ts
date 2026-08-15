@@ -61,12 +61,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     }
 
-    response.status(status).json({
+    const body: Record<string, unknown> = {
       statusCode: status,
       message,
       error,
       timestamp: new Date().toISOString(),
-      path: request.url,
-    });
+    };
+
+    if (!isProduction) {
+      body.path = request.url;
+    }
+
+    response.status(status).json(body);
   }
 }

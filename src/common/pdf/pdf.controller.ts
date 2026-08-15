@@ -3,7 +3,6 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import type { Response } from 'express';
 import { PdfKitService } from './pdfkit.service';
 import type { ReceiptData, TableData } from './pdfkit.service';
-import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('PDF')
 @ApiBearerAuth('jwt-access')
@@ -11,7 +10,6 @@ import { Public } from '../../common/decorators/public.decorator';
 export class PdfController {
   constructor(private readonly pdfService: PdfKitService) {}
 
-  @Public()
   @Post('receipt')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Generate receipt PDF' })
@@ -23,7 +21,6 @@ export class PdfController {
     res.send(pdf);
   }
 
-  @Public()
   @Post('table')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Generate table/report PDF' })

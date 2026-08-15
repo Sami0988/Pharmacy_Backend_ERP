@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { BackupService } from './backup.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 
 @Controller('backup')
@@ -38,6 +39,7 @@ export class BackupController {
   }
 
   @Post('run')
+  @Roles('admin')
   @UseGuards(JwtAuthGuard, RolesGuard)
   async triggerBackup() {
     this.logger.log('Manual backup triggered');

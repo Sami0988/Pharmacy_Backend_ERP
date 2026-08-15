@@ -36,44 +36,46 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin: any, callback: any) => {
-      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(null, true);
+        callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true,
   });
 
-  const config = new DocumentBuilder()
-    .setTitle('Pharmacy ERP API')
-    .setDescription(
-      'Backend API for the Pharmacy ERP system. Handles authentication, inventory management, ' +
-        'goods receipts, batch tracking, stock transfers, supplier payments, and more.',
-    )
-    .setVersion('1.0')
-    .setBasePath('api/v1')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Enter your JWT access token',
-      },
-      'jwt-access',
-    )
-    .addTag('Auth', 'Login, registration, MFA, and password management')
-    .addTag('Items', 'Product catalog management')
-    .addTag('Suppliers', 'Supplier management')
-    .addTag('Goods Receipts', 'Purchase order receiving and GRN creation')
-    .addTag('Batches', 'Batch tracking and QR codes')
-    .addTag('Stock Movements', 'Inventory movement tracking')
-    .addTag('Supplier Payments', 'Payment recording and balance tracking')
-    .addTag('Transfers', 'Inter-location stock transfers with FEFO')
-    .build();
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Pharmacy ERP API')
+      .setDescription(
+        'Backend API for the Pharmacy ERP system. Handles authentication, inventory management, ' +
+          'goods receipts, batch tracking, stock transfers, supplier payments, and more.',
+      )
+      .setVersion('1.0')
+      .setBasePath('api/v1')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Enter your JWT access token',
+        },
+        'jwt-access',
+      )
+      .addTag('Auth', 'Login, registration, MFA, and password management')
+      .addTag('Items', 'Product catalog management')
+      .addTag('Suppliers', 'Supplier management')
+      .addTag('Goods Receipts', 'Purchase order receiving and GRN creation')
+      .addTag('Batches', 'Batch tracking and QR codes')
+      .addTag('Stock Movements', 'Inventory movement tracking')
+      .addTag('Supplier Payments', 'Payment recording and balance tracking')
+      .addTag('Transfers', 'Inter-location stock transfers with FEFO')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('docs', app, document);
+  }
 
   const port = process.env.PORT || 301;
   await app.listen(port);
