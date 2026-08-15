@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { BackupService } from './backup.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Public } from '../common/decorators/public.decorator';
 
 @Controller('backup')
 export class BackupController {
@@ -10,12 +11,14 @@ export class BackupController {
 
   constructor(private readonly backupService: BackupService) {}
 
+  @Public()
   @Get('oauth/authorize')
   getAuthorizeUrl(@Res() res: Response) {
     const url = this.backupService.getAuthorizeUrl();
     res.redirect(url);
   }
 
+  @Public()
   @Get('oauth/callback')
   async handleCallback(@Query('code') code: string, @Res() res: Response) {
     try {
