@@ -3,6 +3,7 @@ import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Worker } from 'bullmq';
 import { BackupService } from './backup.service';
+import { BackupController } from './backup.controller';
 
 @Module({
   imports: [
@@ -10,6 +11,7 @@ import { BackupService } from './backup.service';
       name: 'backup-queue',
     }),
   ],
+  controllers: [BackupController],
   providers: [BackupService],
   exports: [BackupService],
 })
