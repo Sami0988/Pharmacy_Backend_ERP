@@ -408,6 +408,36 @@ export class SalesService {
     }
   }
 
+  async hardDelete(id: string, userId: string) {
+    const sale = await this.findById(id);
+
+    // Reverse credit balance if it was a credit sale
+    if (sale.paymentMethod === 'credit' && sale.customerId) {
+      await this.customersService['repository'].incrementCreditBalance(
+        sale.customerId,
+        -Number(sale.totalAmount),
+      );
+    }
+
+    const deleted = await this.repository.hardDelete(id);
+
+    await this.auditLog.log({
+      userId,
+      action: 'delete_sale',
+      entityType: 'sale',
+      entityId: id,
+      beforeData: {
+        branchId: sale.branchId,
+        customerId: sale.customerId,
+        totalAmount: Number(sale.totalAmount),
+        paymentMethod: sale.paymentMethod,
+        itemCount: sale.items.length,
+      },
+    });
+
+    return deleted;
+  }
+
   async findSubstitutes(itemId: string, dispatcherLocationId: string) {
     const item = await this.getItemById(itemId);
     if (!item?.genericName) return [];

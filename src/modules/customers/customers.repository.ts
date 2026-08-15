@@ -21,10 +21,11 @@ export class CustomersRepository {
       conditions.push(isNull(customers.deletedAt));
     }
     if (params.search) {
+      const normalizedSearch = params.search.replace(/[- .]/g, '');
       conditions.push(
         or(
           ilike(customers.name, `%${params.search}%`),
-          ilike(customers.phone, `%${params.search}%`),
+          sql`regexp_replace(${customers.phone}, '[^0-9+]', '', 'g') ILIKE ${'%' + normalizedSearch + '%'}`,
         )!,
       );
     }

@@ -4,6 +4,7 @@ import {
   sales,
   saleItems,
   saleReturns,
+  stockMovements,
   batches,
   items,
   branches,
@@ -132,6 +133,46 @@ export class SalesRepository {
       .update(sales)
       .set({ receiptUrl, receiptGenerated: receiptUrl !== null })
       .where(eq(sales.id, id));
+  }
+
+  async hardDelete(id: string) {
+    return this.databaseService.db.transaction(async (tx) => {
+      // Find all sale items for this sale
+      const items = await tx
+        .select({ id: saleItems.id })
+        .from(saleItems)
+        .where(eq(saleItems.saleId, id));
+
+      // Delete sale returns for each sale item
+      for (const item of items) {
+        await tx
+          .delete(saleReturns)
+          .where(eq(saleReturns.saleItemId, item.id));
+      }
+
+      // Delete stock movements for this sale
+      await tx
+        .delete(stockMovements)
+        .where(
+          and(
+            eq(stockMovements.refId, id),
+            eq(stockMovements.refType, 'sale'),
+          ),
+        );
+
+      // Delete sale items
+      await tx
+        .delete(saleItems)
+        .where(eq(saleItems.saleId, id));
+
+      // Delete the sale
+      const [deleted] = await tx
+        .delete(sales)
+        .where(eq(sales.id, id))
+        .returning();
+
+      return deleted;
+    });
   }
 
   async findAll(params: {

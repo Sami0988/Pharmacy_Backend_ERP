@@ -81,6 +81,24 @@ export class BatchesRepository {
     return result[0] || null;
   }
 
+  async findByBatchNo(batchNo: string) {
+    const result = await this.databaseService.db
+      .select()
+      .from(batches)
+      .where(eq(batches.batchNo, batchNo))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  async findExistingBatchNos(batchNos: string[]) {
+    if (batchNos.length === 0) return [];
+    const result = await this.databaseService.db
+      .select({ batchNo: batches.batchNo })
+      .from(batches)
+      .where(sql`${batches.batchNo} IN ${batchNos}`);
+    return result.map((r) => r.batchNo);
+  }
+
   async create(data: {
     itemId: string;
     grnId: string;

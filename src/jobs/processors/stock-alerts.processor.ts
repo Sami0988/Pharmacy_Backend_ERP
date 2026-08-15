@@ -4,7 +4,7 @@ import { Job } from 'bullmq';
 import { DatabaseService } from '../../db/database.service';
 import { NotificationsService } from '../../modules/notifications/notifications.service';
 import { StockMovementsService } from '../../modules/stock-movements/stock-movements.service';
-import { items, batches, stockMovements, locations, goodsReceipts, suppliers } from '../../db';
+import { items, batches, stockMovements, locations, goodsReceipts, suppliers, supplierPayments } from '../../db';
 import { eq, and, sql, lt, gte } from 'drizzle-orm';
 
 @Processor('stock-alerts', { concurrency: 1 })
@@ -128,19 +128,21 @@ export class StockAlertsProcessor extends WorkerHost {
   private async checkNearExpiryBatches(results: { nearExpiry: number }) {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
-    const in90Days = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
+    const in270Days = new Date(today.getTime() + 270 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split('T')[0];
 
     const batchesWithStock = await this.getBatchesWithStock();
     const thresholds = [
+      { days: 270, label: '270' },
+      { days: 180, label: '180' },
       { days: 90, label: '90' },
       { days: 60, label: '60' },
       { days: 30, label: '30' },
     ];
 
     for (const batch of batchesWithStock) {
-      if (batch.expiryDate < todayStr || batch.expiryDate >= in90Days) continue;
+      if (batch.expiryDate < todayStr || batch.expiryDate >= in270Days) continue;
 
       for (const threshold of thresholds) {
         const thresholdDate = new Date(today.getTime() + threshold.days * 24 * 60 * 60 * 1000)
@@ -155,10 +157,13 @@ export class StockAlertsProcessor extends WorkerHost {
           );
           if (!existing) {
             const totalQty = await this.getBatchTotalQuantity(batch.batchId);
+            const timeLabel = threshold.days >= 30
+              ? `${Math.round(threshold.days / 30)} month${Math.round(threshold.days / 30) > 1 ? 's' : ''}`
+              : `${threshold.days} days`;
             await this.notificationsService.createNotification({
               type: 'near_expiry',
               title: 'Near-Expiry Warning',
-              message: `Batch ${batch.batchNo} of ${batch.itemName} expires in ${threshold.days} days (${totalQty} units remaining).`,
+              message: `Batch ${batch.batchNo} of ${batch.itemName} expires in ${timeLabel} (${totalQty} units remaining).`,
               itemId: batch.itemId,
               batchId: batch.batchId,
               thresholdDays: threshold.days,
@@ -213,6 +218,7 @@ export class StockAlertsProcessor extends WorkerHost {
         supplierId: goodsReceipts.supplierId,
         supplierName: suppliers.name,
         totalCost: goodsReceipts.totalCost,
+        amountPaid: sql<string>`COALESCE((SELECT SUM(${supplierPayments.amountPaid}) FROM ${supplierPayments} WHERE ${supplierPayments.grnId} = ${goodsReceipts.id}), 0)`,
       })
       .from(goodsReceipts)
       .innerJoin(suppliers, eq(goodsReceipts.supplierId, suppliers.id))
@@ -226,6 +232,9 @@ export class StockAlertsProcessor extends WorkerHost {
 
     for (const grn of grnWithDueDates) {
       if (!grn.paymentDueDate) continue;
+
+      const balance = Number(grn.totalCost) - Number(grn.amountPaid);
+      if (balance <= 0) continue;
 
       const existing = await this.notificationsService.hasExistingUnread(
         'payment_due',
@@ -241,7 +250,7 @@ export class StockAlertsProcessor extends WorkerHost {
       await this.notificationsService.createNotification({
         type: 'payment_due',
         title: 'Payment Due Soon',
-        message: `Payment for GRN ${grn.grnNumber} (${grn.supplierName}) of ${grn.totalCost} is due in ${daysUntilDue} day(s) on ${grn.paymentDueDate}.`,
+        message: `Payment of ${balance} for GRN ${grn.grnNumber} (${grn.supplierName}) is due in ${daysUntilDue} day(s) on ${grn.paymentDueDate}.`,
         itemId: grn.grnId,
       });
       results.paymentDue++;
@@ -259,6 +268,7 @@ export class StockAlertsProcessor extends WorkerHost {
         supplierId: goodsReceipts.supplierId,
         supplierName: suppliers.name,
         totalCost: goodsReceipts.totalCost,
+        amountPaid: sql<string>`COALESCE((SELECT SUM(${supplierPayments.amountPaid}) FROM ${supplierPayments} WHERE ${supplierPayments.grnId} = ${goodsReceipts.id}), 0)`,
       })
       .from(goodsReceipts)
       .innerJoin(suppliers, eq(goodsReceipts.supplierId, suppliers.id))
@@ -271,6 +281,9 @@ export class StockAlertsProcessor extends WorkerHost {
 
     for (const grn of overdueGrns) {
       if (!grn.paymentDueDate) continue;
+
+      const balance = Number(grn.totalCost) - Number(grn.amountPaid);
+      if (balance <= 0) continue;
 
       const existing = await this.notificationsService.hasExistingUnread(
         'payment_overdue',
@@ -286,7 +299,7 @@ export class StockAlertsProcessor extends WorkerHost {
       await this.notificationsService.createNotification({
         type: 'payment_overdue',
         title: 'Payment Overdue',
-        message: `Payment for GRN ${grn.grnNumber} (${grn.supplierName}) of ${grn.totalCost} is ${daysOverdue} day(s) overdue (was due ${grn.paymentDueDate}).`,
+        message: `Payment of ${balance} for GRN ${grn.grnNumber} (${grn.supplierName}) is ${daysOverdue} day(s) overdue (was due ${grn.paymentDueDate}).`,
         itemId: grn.grnId,
       });
       results.paymentOverdue++;

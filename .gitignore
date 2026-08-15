@@ -8,3 +8,4 @@ dist
 drizzle.config.js
 drizzle.config.js.map
 drizzle.config.d.ts
+secrets/

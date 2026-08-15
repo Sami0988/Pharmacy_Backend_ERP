@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   Query,
@@ -9,6 +10,7 @@ import {
   HttpStatus,
   ParseUUIDPipe,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -132,5 +134,19 @@ export class SalesController {
     @CurrentUser('sub') userId: string,
   ) {
     return this.salesService.createReturn(saleId, dto, userId);
+  }
+
+  @Delete(':id')
+  @Roles('admin')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Permanently delete a sale and reverse stock' })
+  @ApiParam({ name: 'id', description: 'Sale UUID' })
+  @ApiResponse({ status: 200, description: 'Sale deleted and stock reversed' })
+  @ApiResponse({ status: 404, description: 'Sale not found' })
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.salesService.hardDelete(id, userId);
   }
 }

@@ -28,6 +28,7 @@ import { HealthModule } from './modules/health/health.module';
 import { TraceabilityModule } from './modules/traceability/traceability.module';
 import { SearchModule } from './modules/search/search.module';
 import { PdfModule } from './common/pdf/pdf.module';
+import { BackupModule } from './backup/backup.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { MfaGuard } from './common/guards/mfa.guard';
@@ -92,6 +93,7 @@ import { MfaGuard } from './common/guards/mfa.guard';
     TraceabilityModule,
     SearchModule,
     PdfModule,
+    BackupModule,
   ],
   providers: [
     {

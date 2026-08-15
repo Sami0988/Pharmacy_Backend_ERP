@@ -94,6 +94,14 @@ export class SuppliersRepository {
     return deleted;
   }
 
+  async hardDelete(id: string) {
+    const [deleted] = await this.databaseService.db
+      .delete(suppliers)
+      .where(eq(suppliers.id, id))
+      .returning();
+    return deleted;
+  }
+
   async getBalances() {
     const result = await this.databaseService.db
       .select({

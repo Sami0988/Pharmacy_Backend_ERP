@@ -24,13 +24,13 @@ export class MinioService implements OnModuleInit {
     buffer: Buffer,
     contentType: string,
   ): Promise<string> {
-    const folder = bucket;
     const publicId = key.replace(/\.[^/.]+$/, '');
+    const shouldUseFolder = !publicId.startsWith(`${bucket}/`);
 
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder,
+          ...(shouldUseFolder ? { folder: bucket } : {}),
           public_id: publicId,
           resource_type: 'auto',
           format: contentType.includes('pdf') ? 'pdf' : undefined,
@@ -41,7 +41,7 @@ export class MinioService implements OnModuleInit {
             reject(error);
           } else {
             this.logger.log(`Uploaded: ${result?.public_id}`);
-            resolve(result?.public_id || key);
+            resolve(result?.secure_url || result?.public_id || key);
           }
         },
       );
@@ -54,9 +54,17 @@ export class MinioService implements OnModuleInit {
     key: string,
     expirySeconds = 3600,
   ): Promise<string> {
+    if (!key) return '';
+    if (key.startsWith('http')) return key;
     try {
-      const publicId = key.includes('/') ? key : `${bucket}/${key}`;
+      // Strip file extension (e.g. .jpg, .pdf) from the key
+      const keyWithoutExt = key.replace(/\.[^/.]+$/, '');
+      // Old records: key is "invoices/supplierId/GRN-xxx" but file is at "invoices/invoices/supplierId/GRN-xxx"
+      const publicId = keyWithoutExt.startsWith(`${bucket}/`)
+        ? `${bucket}/${keyWithoutExt}`
+        : keyWithoutExt;
       const url = cloudinary.url(publicId, {
+        type: 'upload',
         secure: true,
         sign_url: true,
         expires_at: Math.floor(Date.now() / 1000) + expirySeconds,
@@ -70,7 +78,14 @@ export class MinioService implements OnModuleInit {
 
   async deleteFile(bucket: string, key: string): Promise<void> {
     try {
-      const publicId = key.includes('/') ? key : `${bucket}/${key}`;
+      let publicId: string;
+      if (key.startsWith('http')) {
+        // Extract public_id from Cloudinary URL: .../upload/<version>/<public_id>.<format>
+        const match = key.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.\w+)?(?:\?|$)/);
+        publicId = match ? match[1] : key;
+      } else {
+        publicId = key.startsWith(`${bucket}/`) ? key : `${bucket}/${key}`;
+      }
       await cloudinary.uploader.destroy(publicId);
       this.logger.log(`Deleted: ${publicId}`);
     } catch (error) {

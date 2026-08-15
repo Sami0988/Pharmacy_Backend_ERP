@@ -113,11 +113,11 @@ export class SuppliersController {
   @Delete(':id')
   @Roles('admin')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Soft-delete a supplier (sets deleted_at)' })
+  @ApiOperation({ summary: 'Permanently delete a supplier' })
   @ApiParam({ name: 'id', description: 'Supplier UUID' })
-  @ApiResponse({ status: 200, description: 'Supplier soft-deleted' })
+  @ApiResponse({ status: 200, description: 'Supplier permanently deleted' })
   @ApiResponse({ status: 404, description: 'Supplier not found' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.suppliersService.softDelete(id);
+    return this.suppliersService.hardDelete(id);
   }
 }

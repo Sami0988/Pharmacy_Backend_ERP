@@ -90,12 +90,21 @@ export class GoodsReceiptsService {
       );
     }
 
+    const batchNos = dto.items.map((item) => item.batchNo);
+    const existingBatchNos = await this.batchesRepository.findExistingBatchNos(batchNos);
+    if (existingBatchNos.length > 0) {
+      throw new ConflictException(
+        `Batch number(s) already exist: ${existingBatchNos.join(', ')}`,
+      );
+    }
+
     let invoiceKey: string | undefined;
+    let invoiceUrl: string | undefined;
     if (file) {
       try {
         const ext = this.getFileExtension(file.originalname);
         invoiceKey = `invoices/${dto.supplierId}/${grnNumber}.${ext}`;
-        await this.minioService.uploadFile(
+        invoiceUrl = await this.minioService.uploadFile(
           'invoices',
           invoiceKey,
           file.buffer,
@@ -132,7 +141,7 @@ export class GoodsReceiptsService {
             branchId,
             grnNumber,
             receiptDate: dto.receiptDate,
-            invoiceDocumentUrl: invoiceKey,
+            invoiceDocumentUrl: invoiceUrl,
             totalCost: String(totalCost),
             taxPaid,
             paymentDueDate,
@@ -231,6 +240,7 @@ export class GoodsReceiptsService {
 
   async findAll(params: {
     supplierId?: string;
+    supplier?: string;
     branchId?: string;
     search?: string;
     page: number;
@@ -246,7 +256,7 @@ export class GoodsReceiptsService {
     if (!grn) {
       throw new NotFoundException(`Goods receipt ${id} not found`);
     }
-    if (grn.invoiceDocumentUrl) {
+    if (grn.invoiceDocumentUrl && !grn.invoiceDocumentUrl.startsWith('http')) {
       grn.invoiceDocumentUrl = await this.minioService.getSignedUrl('invoices', grn.invoiceDocumentUrl);
     }
     return grn;

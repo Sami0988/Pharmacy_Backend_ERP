@@ -35,6 +35,9 @@ class GoodsReceiptsQueryDto extends PaginationQueryDto {
   supplierId?: string;
   @IsOptional()
   @IsString()
+  supplier?: string;
+  @IsOptional()
+  @IsString()
   branchId?: string;
 }
 
@@ -179,6 +182,7 @@ export class GoodsReceiptsController {
   findAll(@Query() query: GoodsReceiptsQueryDto) {
     return this.service.findAll({
       supplierId: query.supplierId,
+      supplier: query.supplier,
       branchId: query.branchId,
       search: query.search,
       page: query.page!,

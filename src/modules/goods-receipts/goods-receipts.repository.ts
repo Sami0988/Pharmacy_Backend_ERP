@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../db/database.service';
-import { goodsReceipts, suppliers, branches, batches, items } from '../../db';
-import { eq, and, sql, SQL, count, desc, asc } from 'drizzle-orm';
+import { goodsReceipts, suppliers, branches, batches, items, supplierPayments } from '../../db';
+import { eq, and, or, sql, SQL, count, desc, asc } from 'drizzle-orm';
 import { paginate, PaginatedResponse } from '../../common/pagination';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class GoodsReceiptsRepository {
@@ -10,6 +12,7 @@ export class GoodsReceiptsRepository {
 
   async findAll(params: {
     supplierId?: string;
+    supplier?: string;
     branchId?: string;
     search?: string;
     page: number;
@@ -21,8 +24,23 @@ export class GoodsReceiptsRepository {
     if (params.supplierId) {
       conditions.push(eq(goodsReceipts.supplierId, params.supplierId));
     }
+    if (params.supplier) {
+      if (UUID_REGEX.test(params.supplier)) {
+        conditions.push(eq(goodsReceipts.supplierId, params.supplier));
+      } else {
+        conditions.push(
+          sql`${goodsReceipts.supplierId} IN (SELECT ${suppliers.id} FROM ${suppliers} WHERE ${suppliers.name} ILIKE ${'%' + params.supplier + '%'})`,
+        );
+      }
+    }
     if (params.branchId) {
-      conditions.push(eq(goodsReceipts.branchId, params.branchId));
+      if (UUID_REGEX.test(params.branchId)) {
+        conditions.push(eq(goodsReceipts.branchId, params.branchId));
+      } else {
+        conditions.push(
+          sql`${goodsReceipts.branchId} IN (SELECT ${branches.id} FROM ${branches} WHERE ${branches.name} ILIKE ${'%' + params.branchId + '%'})`,
+        );
+      }
     }
     if (params.search) {
       conditions.push(
@@ -69,11 +87,13 @@ export class GoodsReceiptsRepository {
         branchName: branches.name,
         createdBy: goodsReceipts.createdBy,
         batchCount: count(batches.id),
+        amountPaid: sql<string>`COALESCE(SUM(${supplierPayments.amountPaid}), 0)`,
       })
       .from(goodsReceipts)
       .leftJoin(suppliers, eq(goodsReceipts.supplierId, suppliers.id))
       .leftJoin(branches, eq(goodsReceipts.branchId, branches.id))
       .leftJoin(batches, eq(goodsReceipts.id, batches.grnId))
+      .leftJoin(supplierPayments, eq(goodsReceipts.id, supplierPayments.grnId))
       .where(whereClause)
       .groupBy(
         goodsReceipts.id,

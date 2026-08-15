@@ -1,9 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { eq, sql } from 'drizzle-orm';
 import { SuppliersRepository } from './suppliers.repository';
 import { CacheService } from '../../common/cache/cache.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { PaginatedResponse } from '../../common/pagination';
+import { DatabaseService } from '../../db/database.service';
+import { goodsReceipts, supplierPayments } from '../../db';
 
 @Injectable()
 export class SuppliersService {
@@ -12,6 +15,7 @@ export class SuppliersService {
   constructor(
     private readonly suppliersRepository: SuppliersRepository,
     private readonly cache: CacheService,
+    private readonly databaseService: DatabaseService,
   ) {}
 
   async findAll(params: {
@@ -71,6 +75,37 @@ export class SuppliersService {
   async softDelete(id: string) {
     await this.findOne(id);
     const result = await this.suppliersRepository.softDelete(id);
+    await this.cache.del(`${this.cachePrefix}:${id}`);
+    await this.invalidateListCache();
+    return result;
+  }
+
+  async hardDelete(id: string) {
+    await this.findOne(id);
+
+    const db = this.databaseService.db;
+
+    const [grnCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(goodsReceipts)
+      .where(eq(goodsReceipts.supplierId, id));
+
+    const [paymentCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(supplierPayments)
+      .where(eq(supplierPayments.supplierId, id));
+
+    const dependencies: string[] = [];
+    if (grnCount.count > 0) dependencies.push(`${grnCount.count} GRN(s)`);
+    if (paymentCount.count > 0) dependencies.push(`${paymentCount.count} payment(s)`);
+
+    if (dependencies.length > 0) {
+      throw new BadRequestException(
+        `Cannot delete this supplier. It has ${dependencies.join(' and ')}. Delete them first.`,
+      );
+    }
+
+    const result = await this.suppliersRepository.hardDelete(id);
     await this.cache.del(`${this.cachePrefix}:${id}`);
     await this.invalidateListCache();
     return result;

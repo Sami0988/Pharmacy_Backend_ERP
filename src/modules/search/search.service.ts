@@ -21,12 +21,13 @@ export class SearchService {
     }
 
     const searchTerm = `%${query}%`;
+    const normalizedSearch = query.replace(/[- .]/g, '');
 
     const [itemResults, supplierResults, customerResults, batchResults] =
       await Promise.all([
         this.searchItems(searchTerm, limit),
-        this.searchSuppliers(searchTerm, limit),
-        this.searchCustomers(searchTerm, limit),
+        this.searchSuppliers(searchTerm, normalizedSearch, limit),
+        this.searchCustomers(searchTerm, normalizedSearch, limit),
         this.searchBatches(searchTerm, limit),
       ]);
 
@@ -74,6 +75,7 @@ export class SearchService {
 
   private async searchSuppliers(
     searchTerm: string,
+    normalizedSearch: string,
     limit: number,
   ): Promise<SearchResult[]> {
     const results = await this.databaseService.db
@@ -89,7 +91,7 @@ export class SearchService {
           isNull(suppliers.deletedAt),
           or(
             ilike(suppliers.name, searchTerm),
-            ilike(suppliers.phone, searchTerm),
+            sql`regexp_replace(${suppliers.phone}, '[^0-9+]', '', 'g') ILIKE ${'%' + normalizedSearch + '%'}`,
             ilike(suppliers.licenseNo, searchTerm),
           ),
         ),
@@ -110,6 +112,7 @@ export class SearchService {
 
   private async searchCustomers(
     searchTerm: string,
+    normalizedSearch: string,
     limit: number,
   ): Promise<SearchResult[]> {
     const results = await this.databaseService.db
@@ -125,7 +128,7 @@ export class SearchService {
           isNull(customers.deletedAt),
           or(
             ilike(customers.name, searchTerm),
-            ilike(customers.phone, searchTerm),
+            sql`regexp_replace(${customers.phone}, '[^0-9+]', '', 'g') ILIKE ${'%' + normalizedSearch + '%'}`,
           ),
         ),
       )

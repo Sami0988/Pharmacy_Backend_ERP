@@ -340,6 +340,12 @@ export class DashboardRepository {
     const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split('T')[0];
+    const in180 = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
+    const in270 = new Date(Date.now() + 270 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
 
     const getValue = async (fromDate: string, toDate: string) => {
       const result = await this.databaseService.db
@@ -361,13 +367,15 @@ export class DashboardRepository {
       return parseFloat(result[0]?.value ?? '0');
     };
 
-    const [within30, within60, within90] = await Promise.all([
+    const [within30, within60, within90, within180, within270] = await Promise.all([
       getValue(today, in30),
       getValue(in30, in60),
       getValue(in60, in90),
+      getValue(in90, in180),
+      getValue(in180, in270),
     ]);
 
-    return { within30Days: within30, within60Days: within60, within90Days: within90 };
+    return { within30Days: within30, within60Days: within60, within90Days: within90, within180Days: within180, within270Days: within270 };
   }
 
   async getItemSalesVelocity(days: number = 30) {

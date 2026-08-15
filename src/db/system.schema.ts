@@ -20,7 +20,7 @@ export const notifications = pgTable(
     type: notificationTypeEnum('type').notNull(),
     title: text('title').notNull(),
     message: text('message').notNull(),
-    itemId: uuid('item_id').references(() => items.id),
+    itemId: uuid('item_id'),
     batchId: uuid('batch_id').references(() => batches.id),
     thresholdDays: integer('threshold_days'),
     isRead: boolean('is_read').default(false).notNull(),
