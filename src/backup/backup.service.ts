@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import * as crypto from 'crypto';
 import { Client } from 'pg';
 
 @Injectable()
@@ -12,6 +11,75 @@ export class BackupService {
   private readonly connectionString = process.env.DATABASE_URL;
   private readonly driveFolderId = process.env.GOOGLE_DRIVE_BACKUP_FOLDER_ID;
   private readonly retentionDays = 1825;
+
+  private readonly clientId = process.env.GOOGLE_OAUTH_CLIENT_ID!;
+  private readonly clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET!;
+  private readonly refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN!;
+  private readonly redirectUri = 'https://pharmacy-backend-erp.onrender.com/api/v1/backup/oauth/callback';
+
+  private accessToken: string = '';
+  private tokenExpiry = 0;
+
+  getAuthorizeUrl(): string {
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      access_type: 'offline',
+      prompt: 'consent',
+    });
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  async exchangeCode(code: string): Promise<{ accessToken: string; refreshToken: string }> {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        redirect_uri: this.redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Token exchange failed: ${await res.text()}`);
+    }
+
+    const data = await res.json();
+    this.accessToken = data.access_token;
+    this.tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+    return { accessToken: data.access_token, refreshToken: data.refresh_token };
+  }
+
+  private async getAccessToken(): Promise<string> {
+    if (this.accessToken && Date.now() < this.tokenExpiry) {
+      return this.accessToken;
+    }
+
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        refresh_token: this.refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Token refresh failed: ${await res.text()}`);
+    }
+
+    const data = await res.json();
+    this.accessToken = data.access_token;
+    this.tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+    return this.accessToken;
+  }
 
   async runBackup(): Promise<void> {
     const dumpPath = await this.dumpDatabase();
@@ -105,60 +173,6 @@ export class BackupService {
     } finally {
       await client.end();
     }
-  }
-
-  private loadServiceAccountKey() {
-    const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
-    if (!keyPath) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY_PATH env var is not set');
-    return JSON.parse(fs.readFileSync(keyPath, 'utf-8'));
-  }
-
-  private base64urlEncode(data: string): string {
-    return Buffer.from(data)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-  }
-
-  private async getAccessToken(): Promise<string> {
-    const key = this.loadServiceAccountKey();
-    const now = Math.floor(Date.now() / 1000);
-
-    const header = this.base64urlEncode(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-    const payload = this.base64urlEncode(JSON.stringify({
-      iss: key.client_email,
-      scope: 'https://www.googleapis.com/auth/drive.file',
-      aud: 'https://oauth2.googleapis.com/token',
-      iat: now,
-      exp: now + 3600,
-    }));
-
-    const sign = crypto.createSign('RSA-SHA256');
-    sign.update(`${header}.${payload}`);
-    const signature = sign.sign(key.private_key, 'base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-
-    const jwt = `${header}.${payload}.${signature}`;
-
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion: jwt,
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Failed to get access token: ${err}`);
-    }
-
-    const data = await res.json();
-    return data.access_token;
   }
 
   private async uploadToDrive(filePath: string): Promise<void> {

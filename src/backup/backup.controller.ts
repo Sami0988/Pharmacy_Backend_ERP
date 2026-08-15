@@ -1,16 +1,41 @@
-import { Controller, Post, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Query, Res, UseGuards, Logger } from '@nestjs/common';
+import type { Response } from 'express';
 import { BackupService } from './backup.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 
 @Controller('backup')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class BackupController {
   private readonly logger = new Logger(BackupController.name);
 
   constructor(private readonly backupService: BackupService) {}
 
+  @Get('oauth/authorize')
+  getAuthorizeUrl(@Res() res: Response) {
+    const url = this.backupService.getAuthorizeUrl();
+    res.redirect(url);
+  }
+
+  @Get('oauth/callback')
+  async handleCallback(@Query('code') code: string, @Res() res: Response) {
+    try {
+      const tokens = await this.backupService.exchangeCode(code);
+      res.send(`
+        <html><body style="font-family:sans-serif;text-align:center;padding:50px">
+          <h1>Authorization Successful!</h1>
+          <p>Copy this refresh token and add it to Render as <code>GOOGLE_OAUTH_REFRESH_TOKEN</code>:</p>
+          <pre style="background:#f0f0f0;padding:20px;border-radius:8px;font-size:14px;word-break:break-all">${tokens.refreshToken}</pre>
+          <p style="color:#666">You can close this tab.</p>
+        </body></html>
+      `);
+    } catch (error) {
+      this.logger.error('OAuth callback failed', error);
+      res.status(500).send(`Authorization failed: ${error.message}`);
+    }
+  }
+
   @Post('run')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async triggerBackup() {
     this.logger.log('Manual backup triggered');
     try {
