@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Query, Res, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Query, Res, UseGuards, Logger, ForbiddenException } from '@nestjs/common';
 import type { Response } from 'express';
 import { BackupService } from './backup.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -9,6 +9,7 @@ import { Public } from '../common/decorators/public.decorator';
 @Controller('backup')
 export class BackupController {
   private readonly logger = new Logger(BackupController.name);
+  private readonly cronSecret = process.env.BACKUP_CRON_SECRET;
 
   constructor(private readonly backupService: BackupService) {}
 
@@ -43,6 +44,23 @@ export class BackupController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   async triggerBackup() {
     this.logger.log('Manual backup triggered');
+    try {
+      await this.backupService.runBackup();
+      return { message: 'Backup completed successfully' };
+    } catch (error) {
+      this.logger.error('Backup failed', error);
+      return { message: 'Backup failed', error: error.message };
+    }
+  }
+
+  @Public()
+  @Post('cron')
+  async triggerCronBackup(@Query('secret') secret: string) {
+    if (!this.cronSecret || secret !== this.cronSecret) {
+      throw new ForbiddenException('Invalid secret');
+    }
+
+    this.logger.log('Cron backup triggered');
     try {
       await this.backupService.runBackup();
       return { message: 'Backup completed successfully' };
