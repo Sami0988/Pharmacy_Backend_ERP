@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../db/database.service';
-import { batches } from '../../db';
+import { batches, stockMovements } from '../../db';
 import { eq, and, sql, SQL, count, asc } from 'drizzle-orm';
 import { paginate, PaginatedResponse } from '../../common/pagination';
 
@@ -58,7 +58,25 @@ export class BatchesRepository {
     const orderCol = col || batches.expiryDate;
 
     const baseQuery = this.databaseService.db
-      .select()
+      .select({
+        id: batches.id,
+        itemId: batches.itemId,
+        grnId: batches.grnId,
+        batchNo: batches.batchNo,
+        expiryDate: batches.expiryDate,
+        unitCost: batches.unitCost,
+        sellingPrice: batches.sellingPrice,
+        quantityReceived: batches.quantityReceived,
+        qrCodeUrl: batches.qrCodeUrl,
+        createdAt: batches.createdAt,
+        quantities: sql<string>`COALESCE(
+          (SELECT json_agg(json_build_object('locationId', sm.location_id, 'quantity', sm.total))
+           FROM (SELECT sm2.location_id, SUM(sm2.quantity) as total
+                 FROM stock_movements sm2
+                 WHERE sm2.batch_id = ${batches.id}
+                 GROUP BY sm2.location_id) sm), '[]'
+        )`,
+      })
       .from(batches)
       .where(whereClause)
       .orderBy(params.sortOrder === 'desc' ? sql`${orderCol} desc` : asc(orderCol));

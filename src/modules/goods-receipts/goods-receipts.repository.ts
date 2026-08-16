@@ -80,6 +80,7 @@ export class GoodsReceiptsRepository {
         taxPaid: goodsReceipts.taxPaid,
         paymentDueDate: goodsReceipts.paymentDueDate,
         paymentDueDateType: goodsReceipts.paymentDueDateType,
+        paymentMethod: goodsReceipts.paymentMethod,
         createdAt: goodsReceipts.createdAt,
         supplierId: goodsReceipts.supplierId,
         supplierName: suppliers.name,
@@ -107,6 +108,7 @@ export class GoodsReceiptsRepository {
         goodsReceipts.branchId,
         branches.name,
         goodsReceipts.createdBy,
+        goodsReceipts.paymentMethod,
       )
       .orderBy(params.sortOrder === 'asc' ? asc(orderCol) : desc(orderCol));
 
@@ -130,6 +132,7 @@ export class GoodsReceiptsRepository {
         taxPaid: goodsReceipts.taxPaid,
         paymentDueDate: goodsReceipts.paymentDueDate,
         paymentDueDateType: goodsReceipts.paymentDueDateType,
+        paymentMethod: goodsReceipts.paymentMethod,
         createdAt: goodsReceipts.createdAt,
         supplierId: goodsReceipts.supplierId,
         supplierName: suppliers.name,

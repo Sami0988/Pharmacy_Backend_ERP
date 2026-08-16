@@ -55,6 +55,16 @@ export class CreateGoodsReceiptDto {
   paymentDueDateType?: 'one_month' | 'two_months' | 'six_months' | 'one_year' | 'other';
 
   @ApiProperty({
+    enum: ['cash', 'credit', 'mobile_bank'],
+    description: 'Payment method for this receipt',
+    required: false,
+    default: 'cash',
+  })
+  @IsOptional()
+  @IsEnum(['cash', 'credit', 'mobile_bank'])
+  paymentMethod?: 'cash' | 'credit' | 'mobile_bank';
+
+  @ApiProperty({
     example: '2026-10-03',
     description:
       'Custom payment due date. Required when paymentDueDateType is "other".',

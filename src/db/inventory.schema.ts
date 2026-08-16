@@ -55,6 +55,7 @@ export const stockMovements = pgTable(
     quantity: integer('quantity').notNull(),
     refId: uuid('ref_id'),
     refType: text('ref_type'),
+    reason: text('reason'),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id),

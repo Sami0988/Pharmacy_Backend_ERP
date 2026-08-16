@@ -12,7 +12,7 @@ import {
 import { suppliers } from './parties.schema';
 import { branches } from './org.schema';
 import { users } from './users.schema';
-import { paymentDueDateTypeEnum } from './enums';
+import { paymentDueDateTypeEnum, paymentMethodEnum } from './enums';
 
 export const goodsReceipts = pgTable(
   'goods_receipts',
@@ -33,6 +33,7 @@ export const goodsReceipts = pgTable(
     paymentDueDateType: paymentDueDateTypeEnum('payment_due_date_type').default(
       'one_month',
     ),
+    paymentMethod: paymentMethodEnum('payment_method').default('cash').notNull(),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id),

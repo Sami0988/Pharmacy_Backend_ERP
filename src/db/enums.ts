@@ -31,3 +31,9 @@ export const paymentDueDateTypeEnum = pgEnum('payment_due_date_type', [
   'one_year',
   'other',
 ]);
+
+export const paymentMethodEnum = pgEnum('payment_method', [
+  'cash',
+  'credit',
+  'mobile_bank',
+]);

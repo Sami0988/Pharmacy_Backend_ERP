@@ -127,6 +127,7 @@ export class GoodsReceiptsService {
 
     const taxPaid = dto.taxPaid ?? false;
     const paymentDueDateType = dto.paymentDueDateType ?? 'one_month';
+    const paymentMethod = dto.paymentMethod ?? 'cash';
     const paymentDueDate =
       paymentDueDateType === 'other'
         ? dto.paymentDueDate
@@ -146,6 +147,7 @@ export class GoodsReceiptsService {
             taxPaid,
             paymentDueDate,
             paymentDueDateType,
+            paymentMethod,
             createdBy: userId,
           })
           .returning();

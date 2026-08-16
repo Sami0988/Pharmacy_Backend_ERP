@@ -27,4 +27,14 @@ export class StockMovementsService {
   async getBatchQuantitiesByLocation(batchId: string) {
     return this.repository.getBatchQuantitiesByLocation(batchId);
   }
+
+  async adjustStock(params: {
+    batchId: string;
+    locationId: string;
+    newQuantity: number;
+    reason: string;
+    createdBy: string;
+  }) {
+    return this.repository.adjustStock(params);
+  }
 }

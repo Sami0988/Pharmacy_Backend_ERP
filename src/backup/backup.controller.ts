@@ -35,7 +35,7 @@ export class BackupController {
       `);
     } catch (error) {
       this.logger.error('OAuth callback failed', error);
-      res.status(500).send(`Authorization failed: ${error.message}`);
+      res.status(500).send(`Authorization failed: ${(error as Error).message}`);
     }
   }
 
@@ -49,7 +49,7 @@ export class BackupController {
       return { message: 'Backup completed successfully' };
     } catch (error) {
       this.logger.error('Backup failed', error);
-      return { message: 'Backup failed', error: error.message };
+      return { message: 'Backup failed', error: (error as Error).message };
     }
   }
 
@@ -66,7 +66,7 @@ export class BackupController {
       return { message: 'Backup completed successfully' };
     } catch (error) {
       this.logger.error('Backup failed', error);
-      return { message: 'Backup failed', error: error.message };
+      return { message: 'Backup failed', error: (error as Error).message };
     }
   }
 }

@@ -10,9 +10,11 @@ import {
 import { BatchesService } from './batches.service';
 import { PaginationQueryDto } from '../../common/pagination';
 import { Type } from 'class-transformer';
-import { IsOptional, IsInt, Min } from 'class-validator';
+import { IsOptional, IsInt, IsString, Min } from 'class-validator';
 
 class BatchesQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
   itemId?: string;
 
   @IsOptional()
