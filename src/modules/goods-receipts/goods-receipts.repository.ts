@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../../db/database.service';
-import { goodsReceipts, suppliers, branches, batches, items, supplierPayments } from '../../db';
+import { goodsReceipts, suppliers, branches, batches, items, supplierPayments, stockMovements, saleItems, transfers } from '../../db';
 import { eq, and, or, sql, SQL, count, desc, asc } from 'drizzle-orm';
 import { paginate, PaginatedResponse } from '../../common/pagination';
 
@@ -200,5 +200,71 @@ export class GoodsReceiptsRepository {
       })
       .returning();
     return row;
+  }
+
+  async hardDelete(id: string) {
+    const grn = await this.databaseService.db
+      .select()
+      .from(goodsReceipts)
+      .where(eq(goodsReceipts.id, id))
+      .limit(1);
+
+    if (!grn[0]) return null;
+
+    const grnBatches = await this.databaseService.db
+      .select({ id: batches.id })
+      .from(batches)
+      .where(eq(batches.grnId, id));
+
+    if (grnBatches.length > 0) {
+      const batchIds = grnBatches.map((b) => b.id);
+
+      const soldItems = await this.databaseService.db
+        .select({ id: saleItems.id })
+        .from(saleItems)
+        .where(sql`${saleItems.batchId} IN ${batchIds}`)
+        .limit(1);
+
+      if (soldItems.length > 0) {
+        throw new BadRequestException(
+          'Cannot delete GRN: some batches have been sold. Reverse the sales first.',
+        );
+      }
+
+      const transferredItems = await this.databaseService.db
+        .select({ id: transfers.id })
+        .from(transfers)
+        .where(sql`${transfers.batchId} IN ${batchIds}`)
+        .limit(1);
+
+      if (transferredItems.length > 0) {
+        throw new BadRequestException(
+          'Cannot delete GRN: some batches have been transferred. Reverse the transfers first.',
+        );
+      }
+    }
+
+    return this.databaseService.db.transaction(async (tx) => {
+      await tx
+        .delete(supplierPayments)
+        .where(eq(supplierPayments.grnId, id));
+
+      for (const batch of grnBatches) {
+        await tx
+          .delete(stockMovements)
+          .where(eq(stockMovements.batchId, batch.id));
+      }
+
+      await tx
+        .delete(batches)
+        .where(eq(batches.grnId, id));
+
+      const [deleted] = await tx
+        .delete(goodsReceipts)
+        .where(eq(goodsReceipts.id, id))
+        .returning();
+
+      return deleted;
+    });
   }
 }

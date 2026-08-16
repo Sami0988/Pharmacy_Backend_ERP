@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Param,
   Body,
   Query,
@@ -209,5 +210,20 @@ export class GoodsReceiptsController {
   async getInvoiceUrl(@Param('id') id: string) {
     const url = await this.service.getInvoiceUrl(id);
     return { url };
+  }
+
+  @Delete(':id')
+  @Roles('admin')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete a goods receipt' })
+  @ApiParam({ name: 'id', description: 'GRN UUID' })
+  @ApiResponse({ status: 200, description: 'GRN deleted successfully' })
+  @ApiResponse({ status: 400, description: 'GRN has been sold or transferred' })
+  @ApiResponse({ status: 404, description: 'GRN not found' })
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.service.remove(id, userId);
   }
 }

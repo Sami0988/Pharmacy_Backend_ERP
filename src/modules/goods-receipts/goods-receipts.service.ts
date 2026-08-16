@@ -272,6 +272,33 @@ export class GoodsReceiptsService {
     return this.minioService.getSignedUrl('invoices', grn.invoiceDocumentUrl);
   }
 
+  async remove(id: string, userId: string) {
+    const grn = await this.findById(id);
+
+    const deleted = await this.repository.hardDelete(id);
+    if (!deleted) {
+      throw new NotFoundException(`Goods receipt ${id} not found`);
+    }
+
+    if (grn.invoiceDocumentUrl && !grn.invoiceDocumentUrl.startsWith('http')) {
+      try {
+        await this.minioService.deleteFile('invoices', grn.invoiceDocumentUrl);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+
+    await this.auditLog.log({
+      userId,
+      action: 'DELETE_GOODS_RECEIPT',
+      entityType: 'goods_receipt',
+      entityId: id,
+      beforeData: { grnNumber: grn.grnNumber, totalCost: grn.totalCost },
+    });
+
+    return { message: 'Goods receipt deleted successfully' };
+  }
+
   private calculatePaymentDueDate(
     receiptDate: string,
     type: 'one_month' | 'two_months' | 'six_months' | 'one_year',
