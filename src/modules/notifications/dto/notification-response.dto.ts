@@ -16,6 +16,8 @@ export class NotificationSummaryDto {
   lowStock: number;
   nearExpiry: number;
   expired: number;
+  paymentDue: number;
+  paymentOverdue: number;
 }
 
 export class UnreadCountDto {

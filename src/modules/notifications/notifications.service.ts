@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationsRepository } from './notifications.repository';
+import { DatabaseService } from '../../db/database.service';
+import { goodsReceipts, supplierPayments } from '../../db';
+import { eq, sql } from 'drizzle-orm';
 import { SaleCreatedEvent, PaymentRecordedEvent, TransferCompletedEvent } from '../../common/events';
 import { PaginatedResponse } from '../../common/pagination';
 
@@ -8,7 +11,10 @@ import { PaginatedResponse } from '../../common/pagination';
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly repository: NotificationsRepository) {}
+  constructor(
+    private readonly repository: NotificationsRepository,
+    private readonly databaseService: DatabaseService,
+  ) {}
 
   async findAll(params: {
     type?: string;
@@ -62,14 +68,46 @@ export class NotificationsService {
     return this.repository.findExistingUnreadWithThreshold(type, batchId, thresholdDays);
   }
 
+  async markPaymentNotificationsAsReadByGrnId(grnId: string) {
+    return this.repository.markPaymentNotificationsAsReadByGrnId(grnId);
+  }
+
   @OnEvent('sale.created')
   handleSaleCreated(event: SaleCreatedEvent) {
     this.logger.debug(`Sale created event received: ${event.saleId}`);
   }
 
   @OnEvent('payment.recorded')
-  handlePaymentRecorded(event: PaymentRecordedEvent) {
+  async handlePaymentRecorded(event: PaymentRecordedEvent) {
     this.logger.debug(`Payment recorded event received: ${event.paymentId}`);
+
+    try {
+      const grnResult = await this.databaseService.db
+        .select({
+          totalCost: goodsReceipts.totalCost,
+        })
+        .from(goodsReceipts)
+        .where(eq(goodsReceipts.id, event.grnId))
+        .limit(1);
+
+      if (grnResult.length === 0) return;
+
+      const totalPaid = await this.databaseService.db
+        .select({
+          total: sql<string>`COALESCE(SUM(${supplierPayments.amountPaid}), 0)`,
+        })
+        .from(supplierPayments)
+        .where(eq(supplierPayments.grnId, event.grnId));
+
+      const outstanding = parseFloat(grnResult[0].totalCost) - parseFloat(totalPaid[0].total);
+
+      if (outstanding <= 0) {
+        await this.repository.markPaymentNotificationsAsReadByGrnId(event.grnId);
+        this.logger.log(`Cleared payment notifications for fully paid GRN: ${event.grnId}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to clear payment notifications for GRN ${event.grnId}`, error);
+    }
   }
 
   @OnEvent('transfer.completed')

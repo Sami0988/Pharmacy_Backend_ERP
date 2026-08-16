@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../db/database.service';
 import { notifications } from '../../db';
-import { eq, and, desc, sql, count } from 'drizzle-orm';
+import { eq, and, desc, sql, count, inArray } from 'drizzle-orm';
 import { paginate, PaginatedResponse } from '../../common/pagination';
 
 @Injectable()
@@ -128,6 +128,22 @@ export class NotificationsRepository {
       .where(eq(notifications.isRead, false));
   }
 
+  async markPaymentNotificationsAsReadByGrnId(grnId: string) {
+    await this.databaseService.db
+      .update(notifications)
+      .set({
+        isRead: true,
+        readAt: new Date(),
+      })
+      .where(
+        and(
+          inArray(notifications.type, ['payment_due', 'payment_overdue']),
+          eq(notifications.itemId, grnId),
+          eq(notifications.isRead, false),
+        ),
+      );
+  }
+
   async getSummary() {
     const result = await this.databaseService.db
       .select({
@@ -143,6 +159,8 @@ export class NotificationsRepository {
       lowStock: 0,
       nearExpiry: 0,
       expired: 0,
+      paymentDue: 0,
+      paymentOverdue: 0,
     };
 
     for (const row of result) {
@@ -158,6 +176,12 @@ export class NotificationsRepository {
           break;
         case 'expired':
           summary.expired = Number(row.count);
+          break;
+        case 'payment_due':
+          summary.paymentDue = Number(row.count);
+          break;
+        case 'payment_overdue':
+          summary.paymentOverdue = Number(row.count);
           break;
       }
     }
