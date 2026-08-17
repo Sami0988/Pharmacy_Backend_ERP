@@ -54,7 +54,7 @@ export class BackupController {
   }
 
   @Public()
-  @Post('cron')
+  @Get('cron')
   async triggerCronBackup(@Query('secret') secret: string) {
     if (!this.cronSecret || secret !== this.cronSecret) {
       throw new ForbiddenException('Invalid secret');
