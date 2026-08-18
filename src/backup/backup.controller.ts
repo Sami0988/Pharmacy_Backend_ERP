@@ -53,20 +53,22 @@ export class BackupController {
     }
   }
 
-  @Public()
-  @Get('cron')
-  async triggerCronBackup(@Query('secret') secret: string) {
-    if (!this.cronSecret || secret !== this.cronSecret) {
-      throw new ForbiddenException('Invalid secret');
-    }
+   @Public()
+   @Get('cron')
+   async triggerCronBackup(@Query('secret') secret: string, @Res() res: Response) {
+     if (!this.cronSecret || secret !== this.cronSecret) {
+       res.status(403).json({ status: 'error', message: 'Invalid secret' });
+       return;
+     }
 
-    this.logger.log('Cron backup triggered');
-    try {
-      await this.backupService.runBackup();
-      return { message: 'Backup completed successfully' };
-    } catch (error) {
-      this.logger.error('Backup failed', error);
-      return { message: 'Backup failed', error: (error as Error).message };
-    }
-  }
+     this.logger.log('Cron backup triggered');
+     
+     // Return 202 Accepted immediately, run backup in background
+     res.status(202).json({ status: 'accepted', message: 'Backup started' });
+
+     // Run backup asynchronously
+     this.backupService.runBackup().catch((err) => {
+       this.logger.error('Background backup failed:', err instanceof Error ? err.message : String(err));
+     });
+   }
 }

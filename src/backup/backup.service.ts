@@ -3,7 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as zlib from 'zlib';
-import { Client } from 'pg';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 @Injectable()
 export class BackupService {
@@ -107,8 +110,44 @@ export class BackupService {
     const fileName = `pharmacy-backup-${dateStamp}.sql.gz`;
     const filePath = path.join(os.tmpdir(), fileName);
 
-    this.logger.log(`Starting database backup -> ${filePath}`);
+    this.logger.log(`Starting database backup`);
 
+    // Try pg_dump first (fast native backup), fall back to Node.js dump
+    try {
+      await this.dumpWithPgDump(filePath);
+      this.logger.log(`Backup completed via pg_dump: ${filePath}`);
+      return filePath;
+    } catch (pgErr) {
+      this.logger.warn(`pg_dump failed, falling back to Node.js dump: ${(pgErr as Error).message}`);
+      return this.dumpWithClient(filePath);
+    }
+  }
+
+  private async dumpWithPgDump(filePath: string): Promise<void> {
+    // Remove .gz extension for pg_dump, we'll compress separately
+    const rawPath = filePath.replace('.gz', '');
+    
+    await execFileAsync('pg_dump', [
+      '--no-password',
+      '--format=plain',
+      '--file', rawPath,
+      this.connectionString || '',
+    ], {
+      timeout: 120000,
+      maxBuffer: 500 * 1024 * 1024, // 500MB buffer
+    });
+
+    // Compress with gzip
+    const sqlBuffer = fs.readFileSync(rawPath);
+    const compressed = zlib.gzipSync(sqlBuffer);
+    fs.writeFileSync(filePath, compressed);
+    fs.unlinkSync(rawPath);
+    
+    this.logger.log(`Backup written: ${filePath} (${(compressed.length / 1024 / 1024).toFixed(2)} MB compressed)`);
+  }
+
+  private async dumpWithClient(filePath: string): Promise<string> {
+    const { Client } = await import('pg');
     const client = new Client({ connectionString: this.connectionString });
     await client.connect();
 
@@ -118,8 +157,8 @@ export class BackupService {
         WHERE schemaname = 'public' ORDER BY tablename
       `);
 
-      let sql = '-- Pharmacy ERP Backup\n';
-      sql += `-- Generated: ${new Date().toISOString()}\n\n`;
+      let sql = '-- Pharmacy ERP Backup\\n';
+      sql += `-- Generated: ${new Date().toISOString()}\\n\\n`;
 
       for (const row of tables.rows) {
         const tableName = row.tablename;
@@ -153,8 +192,8 @@ export class BackupService {
           return `  "${c.column_name}" ${type}${nullable}${def}`;
         });
 
-        sql += `DROP TABLE IF EXISTS "${tableName}" CASCADE;\n`;
-        sql += `CREATE TABLE "${tableName}" (\n${colDefs.join(',\n')}\n);\n\n`;
+        sql += `DROP TABLE IF EXISTS "${tableName}" CASCADE;\\n`;
+        sql += `CREATE TABLE "${tableName}" (\\n${colDefs.join(',\\n')}\\n);\\n\\n`;
 
         const colNames = cols.rows.map(c => `"${c.column_name}"`);
         const data = await client.query(`SELECT * FROM "${tableName}"`);
@@ -162,9 +201,9 @@ export class BackupService {
         if (data.rows.length > 0) {
           for (const drow of data.rows) {
             const values = Object.values(drow).map(v => this.escapeValue(v));
-            sql += `INSERT INTO "${tableName}" (${colNames.join(', ')}) VALUES (${values.join(', ')});\n`;
+            sql += `INSERT INTO "${tableName}" (${colNames.join(', ')}) VALUES (${values.join(', ')});\\n`;
           }
-          sql += '\n';
+          sql += '\\n';
         }
       }
 
