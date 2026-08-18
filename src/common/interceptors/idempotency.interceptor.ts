@@ -9,7 +9,7 @@ import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { CacheService } from '../cache/cache.service';
 
-const IDEMPOTENCY_TTL = 86400; // 24 hours
+const IDEMPOTENCY_TTL = 3600; // 1 hour (reduced from 24h to save Redis commands)
 
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {

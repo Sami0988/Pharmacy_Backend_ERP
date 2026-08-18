@@ -31,7 +31,7 @@ export class SuppliersService {
     if (cached) return cached;
 
     const result = await this.suppliersRepository.findAll(params);
-    await this.cache.set(cacheKey, result, 600);
+    await this.cache.set(cacheKey, result, 1200);
     return result;
   }
 
@@ -44,7 +44,7 @@ export class SuppliersService {
     if (!supplier) {
       throw new NotFoundException('Supplier not found');
     }
-    await this.cache.set(cacheKey, supplier, 600);
+    await this.cache.set(cacheKey, supplier, 1200);
     return supplier;
   }
 

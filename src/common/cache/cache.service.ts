@@ -94,16 +94,31 @@ export class CacheService implements OnModuleDestroy {
   }
 
   /**
-   * Delete all keys matching a pattern
-   * Use with caution — prefer targeted invalidation
+   * Delete all keys matching a pattern using SCAN (non-blocking)
    */
   async delPattern(pattern: string): Promise<void> {
     if (!this.client) return;
     try {
-      const keys = await this.client.keys(pattern);
-      if (keys.length > 0) {
-        await this.client.del(...keys);
-      }
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = nextCursor;
+        if (keys.length > 0) {
+          await this.client.del(...keys);
+        }
+      } while (cursor !== '0');
+    } catch {
+      // Silently fail
+    }
+  }
+
+  /**
+   * Delete multiple specific keys at once
+   */
+  async delMany(keys: string[]): Promise<void> {
+    if (!this.client || keys.length === 0) return;
+    try {
+      await this.client.del(...keys);
     } catch {
       // Silently fail
     }

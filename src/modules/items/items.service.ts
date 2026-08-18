@@ -31,7 +31,7 @@ export class ItemsService {
     if (cached) return cached;
 
     const result = await this.itemsRepository.findAll(params);
-    await this.cache.set(cacheKey, result, 600);
+    await this.cache.set(cacheKey, result, 1200);
     return result;
   }
 
@@ -44,7 +44,7 @@ export class ItemsService {
     if (!item) {
       throw new NotFoundException('Item not found');
     }
-    await this.cache.set(cacheKey, item, 600);
+    await this.cache.set(cacheKey, item, 1200);
     return item;
   }
 

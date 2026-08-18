@@ -20,6 +20,12 @@ import { DatabaseModule } from '../db/database.module';
           tls: configService.get<string>('REDIS_HOST', 'localhost').includes('upstash.io')
             ? {}
             : undefined,
+          enableOfflineQueue: true,
+          maxRetriesPerRequest: null,
+        },
+        defaultJobOptions: {
+          removeOnComplete: true,
+          removeOnFail: false,
         },
       }),
     }),
