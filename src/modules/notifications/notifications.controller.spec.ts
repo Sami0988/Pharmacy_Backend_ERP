@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
-import { StockAlertsProcessor } from '../../../jobs/processors/stock-alerts.processor';
+import { StockAlertsProcessor } from './stock-alerts.processor';
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;

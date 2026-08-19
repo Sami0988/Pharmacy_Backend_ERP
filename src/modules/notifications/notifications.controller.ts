@@ -14,7 +14,7 @@ import { IsOptional, IsString } from 'class-validator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { NotificationsService } from './notifications.service';
-import { StockAlertsProcessor } from '../../jobs/processors/stock-alerts.processor';
+import { StockAlertsProcessor } from './stock-alerts.processor';
 import { PaginationQueryDto } from '../../common/pagination';
 
 class NotificationsQueryDto extends PaginationQueryDto {

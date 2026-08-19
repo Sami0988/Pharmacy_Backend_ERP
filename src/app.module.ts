@@ -19,7 +19,6 @@ import { SalesModule } from './modules/sales/sales.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { SupplierPaymentsModule } from './modules/supplier-payments/supplier-payments.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
-import { JobsModule } from './jobs/jobs.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ExportModule } from './common/export/export.module';
@@ -84,7 +83,6 @@ import { MfaGuard } from './common/guards/mfa.guard';
     CustomersModule,
     SupplierPaymentsModule,
     NotificationsModule,
-    JobsModule,
     ReportsModule,
     DashboardModule,
     ExportModule,
