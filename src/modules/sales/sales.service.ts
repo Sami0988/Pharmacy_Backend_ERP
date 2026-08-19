@@ -70,6 +70,7 @@ export class SalesService {
 
     for (let i = 0; i < dto.items.length; i++) {
       const line = dto.items[i];
+      const saleUnit = line.saleUnit ?? 'single';
 
       if (!Number.isInteger(line.quantity) || line.quantity <= 0) {
         lineErrors.push({
@@ -93,10 +94,11 @@ export class SalesService {
       let batchId = line.batchId;
 
       if (!batchId) {
+        const unitsNeeded = saleUnit === 'pack' ? line.quantity : line.quantity;
         const fefoResult = await this.transfersService.getFefoSuggestions(
           line.itemId,
           dispatcherLocationId,
-          line.quantity,
+          unitsNeeded,
         );
 
         if (fefoResult.suggestions.length === 0) {
@@ -145,36 +147,55 @@ export class SalesService {
         continue;
       }
 
+      const packSize = batch.packSize ?? 1;
+      const unitsToDeduct = saleUnit === 'pack' ? line.quantity * packSize : line.quantity;
+
       const currentQuantity =
         await this.stockMovementsService.getCurrentQuantity(
           batchId,
           dispatcherLocationId,
         );
 
-      if (currentQuantity < line.quantity) {
+      if (currentQuantity < unitsToDeduct) {
         lineErrors.push({
           itemIndex: i,
           itemId: line.itemId,
-          message: `Insufficient stock for "${item.name}" (batch ${batch.batchNo}). Available: ${currentQuantity}, Requested: ${line.quantity}`,
+          message: `Insufficient stock for "${item.name}" (batch ${batch.batchNo}). Available: ${currentQuantity} units, Requested: ${unitsToDeduct} units${saleUnit === 'pack' ? ` (${line.quantity} packs × ${packSize})` : ''}`,
         });
         continue;
       }
 
-      if (!batch.sellingPrice) {
-        lineErrors.push({
-          itemIndex: i,
+      if (saleUnit === 'pack') {
+        if (!batch.packPrice) {
+          lineErrors.push({
+            itemIndex: i,
+            itemId: line.itemId,
+            message: `Batch ${batch.batchNo} of "${item.name}" has no pack price configured`,
+          });
+          continue;
+        }
+        resolvedLines.push({
           itemId: line.itemId,
-          message: `Batch ${batch.batchNo} of "${item.name}" has no selling price configured`,
+          batchId,
+          quantity: unitsToDeduct,
+          unitPrice: Number(batch.packPrice),
         });
-        continue;
+      } else {
+        if (!batch.sellingPrice) {
+          lineErrors.push({
+            itemIndex: i,
+            itemId: line.itemId,
+            message: `Batch ${batch.batchNo} of "${item.name}" has no selling price configured`,
+          });
+          continue;
+        }
+        resolvedLines.push({
+          itemId: line.itemId,
+          batchId,
+          quantity: line.quantity,
+          unitPrice: Number(batch.sellingPrice),
+        });
       }
-
-      resolvedLines.push({
-        itemId: line.itemId,
-        batchId,
-        quantity: line.quantity,
-        unitPrice: Number(batch.sellingPrice),
-      });
     }
 
     if (lineErrors.length > 0) {

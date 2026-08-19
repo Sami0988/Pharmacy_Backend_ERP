@@ -88,4 +88,13 @@ export class GoodsReceiptItemDto {
   })
   @IsOptional()
   markupPercentage?: number;
+
+  @ApiPropertyOptional({
+    example: 1200,
+    description: 'Selling price per pack (optional, for pack sales)',
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  packPrice?: number;
 }

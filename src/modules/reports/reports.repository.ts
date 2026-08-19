@@ -28,6 +28,7 @@ export class ReportsRepository {
     totalQuantity: number;
     totalValueAtCost: number;
     sellingPrice: number;
+    packPrice: number | null;
     packSize: number;
     storePacks: number;
     dispatcherPacks: number;
@@ -61,6 +62,17 @@ export class ReportsRepository {
           order by sum(sm2.quantity) desc
           limit 1
         ), '0')`,
+
+        packPrice: sql<string | null>`(
+          select b2.pack_price from batches b2
+          inner join stock_movements sm2 on sm2.batch_id = b2.id
+          where b2.item_id = ${items.id} and b2.pack_price is not null and sm2.location_id in (
+            select l2.id from locations l2 where l2.name = 'Dispatcher'
+          )
+          group by b2.id, b2.pack_price
+          order by sum(sm2.quantity) desc
+          limit 1
+        )`,
       })
       .from(items)
       .innerJoin(batches, eq(batches.itemId, items.id))
@@ -87,6 +99,7 @@ export class ReportsRepository {
         dispatcherPacks: Math.floor(dispatcherQty / packSize),
         totalPacks: Math.floor(totalQty / packSize),
         sellingPrice: Number(r.sellingPrice),
+        packPrice: r.packPrice != null ? Number(r.packPrice) : null,
       };
     });
   }
@@ -126,6 +139,17 @@ export class ReportsRepository {
           order by sum(sm2.quantity) desc
           limit 1
         ), '0')`,
+
+        packPrice: sql<string | null>`(
+          select b2.pack_price from batches b2
+          inner join stock_movements sm2 on sm2.batch_id = b2.id
+          where b2.item_id = ${items.id} and b2.pack_price is not null and sm2.location_id in (
+            select l2.id from locations l2 where l2.name = 'Dispatcher'
+          )
+          group by b2.id, b2.pack_price
+          order by sum(sm2.quantity) desc
+          limit 1
+        )`,
       })
       .from(items)
       .innerJoin(batches, eq(batches.itemId, items.id))
@@ -159,6 +183,7 @@ export class ReportsRepository {
       avgCost: number;
       packSize: number;
       sellingPrice: string;
+      packPrice: string | null;
     }>({
       db: this.databaseService.db,
       baseQuery,
@@ -186,6 +211,7 @@ export class ReportsRepository {
           dispatcherPacks: Math.floor(dispatcherQty / packSize),
           totalPacks: Math.floor(totalQty / packSize),
           sellingPrice: Number(r.sellingPrice),
+          packPrice: r.packPrice != null ? Number(r.packPrice) : null,
         };
       }),
     };
@@ -522,6 +548,7 @@ export class ReportsRepository {
         packSize: batches.packSize,
         unitCost: batches.unitCost,
         sellingPrice: batches.sellingPrice,
+        packPrice: batches.packPrice,
         quantity: sql<number>`coalesce(sum(${stockMovements.quantity}), 0)`,
       })
       .from(batches)
@@ -536,6 +563,7 @@ export class ReportsRepository {
         batches.packSize,
         batches.unitCost,
         batches.sellingPrice,
+        batches.packPrice,
         items.name,
       )
       .having(sql`sum(${stockMovements.quantity}) > 0`)
@@ -550,6 +578,7 @@ export class ReportsRepository {
       packSize: r.packSize,
       unitCost: Number(r.unitCost),
       sellingPrice: Number(r.sellingPrice),
+      packPrice: r.packPrice != null ? Number(r.packPrice) : null,
       quantity: Number(r.quantity),
     }));
   }

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsUUID, IsInt, IsPositive, IsOptional } from 'class-validator';
+import { IsUUID, IsInt, IsPositive, IsOptional, IsIn } from 'class-validator';
 
 export class SaleItemDto {
   @ApiProperty({
@@ -21,4 +21,13 @@ export class SaleItemDto {
   @IsUUID()
   @IsOptional()
   batchId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Sale unit type: "single" for individual units, "pack" for full packs',
+    enum: ['single', 'pack'],
+    default: 'single',
+  })
+  @IsIn(['single', 'pack'])
+  @IsOptional()
+  saleUnit?: 'single' | 'pack';
 }

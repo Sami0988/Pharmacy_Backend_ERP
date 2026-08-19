@@ -30,6 +30,7 @@ export const batches = pgTable(
     packSize: integer('pack_size').notNull().default(1),
     unitCost: decimal('unit_cost').notNull(),
     sellingPrice: decimal('selling_price').notNull(),
+    packPrice: decimal('pack_price'),
     quantityReceived: integer('quantity_received').notNull(),
     qrCodeUrl: text('qr_code_url'),
     createdAt: timestamp('created_at').defaultNow().notNull(),

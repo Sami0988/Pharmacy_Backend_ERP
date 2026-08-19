@@ -60,4 +60,13 @@ export class UpdateBatchItemDto {
   })
   @IsOptional()
   markupPercentage?: number;
+
+  @ApiPropertyOptional({
+    example: 1200,
+    description: 'Updated selling price per pack',
+  })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  packPrice?: number;
 }

@@ -71,8 +71,10 @@ export class BatchesRepository {
         grnId: batches.grnId,
         batchNo: batches.batchNo,
         expiryDate: batches.expiryDate,
+        packSize: batches.packSize,
         unitCost: batches.unitCost,
         sellingPrice: batches.sellingPrice,
+        packPrice: batches.packPrice,
         quantityReceived: batches.quantityReceived,
         qrCodeUrl: batches.qrCodeUrl,
         createdAt: batches.createdAt,
@@ -164,6 +166,7 @@ export class BatchesRepository {
     packSize?: number;
     unitCost?: number;
     sellingPrice?: number;
+    packPrice?: string | null;
     quantityReceived?: number;
   }) {
     const updateData: Record<string, any> = {};
@@ -172,6 +175,7 @@ export class BatchesRepository {
     if (data.packSize !== undefined) updateData.packSize = data.packSize;
     if (data.unitCost !== undefined) updateData.unitCost = String(data.unitCost);
     if (data.sellingPrice !== undefined) updateData.sellingPrice = String(data.sellingPrice);
+    if (data.packPrice !== undefined) updateData.packPrice = data.packPrice;
     if (data.quantityReceived !== undefined) updateData.quantityReceived = data.quantityReceived;
 
     if (Object.keys(updateData).length === 0) return null;

@@ -188,6 +188,7 @@ export class GoodsReceiptsService {
               packSize: item.packSize,
               unitCost: String(costPerUnit),
               sellingPrice: String(sellingPrice),
+              packPrice: item.packPrice != null ? String(item.packPrice) : null,
               quantityReceived: totalUnits,
             })
             .returning();
@@ -457,12 +458,19 @@ export class GoodsReceiptsService {
           }
         }
 
+        const newPackPrice = itemDto.packPrice !== undefined
+          ? itemDto.packPrice
+          : batch.packPrice != null
+            ? Number(batch.packPrice)
+            : null;
+
         await this.batchesRepository.update(batch.id, {
           batchNo: itemDto.batchNo,
           expiryDate: itemDto.expiryDate,
           packSize: itemDto.packSize,
           unitCost: itemDto.unitCost !== undefined ? itemDto.unitCost / newPackSize : undefined,
           sellingPrice: newSellingPrice,
+          packPrice: newPackPrice != null ? String(newPackPrice) : null,
           quantityReceived: newTotalUnits,
         });
 
