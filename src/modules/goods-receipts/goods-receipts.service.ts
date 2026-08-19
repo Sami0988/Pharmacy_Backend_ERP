@@ -128,7 +128,7 @@ export class GoodsReceiptsService {
     }
 
     const totalCost = dto.items.reduce(
-      (sum, item) => sum + item.numberOfPacks * item.unitCost,
+      (sum, item) => sum + item.numberOfPacks * item.packSize * item.unitCost,
       0,
     );
 
