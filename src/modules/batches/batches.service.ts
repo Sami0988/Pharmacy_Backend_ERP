@@ -53,12 +53,18 @@ export class BatchesService {
     const quantities =
       await this.stockMovementsService.getBatchQuantitiesByLocation(batch.id);
 
+    const quantitiesWithPacks = quantities.map((q) => ({
+      ...q,
+      packSize: q.packSize ?? 1,
+      numberOfPacks: Math.floor(q.quantity / (q.packSize ?? 1)),
+    }));
+
     return {
       ...batch,
       item: itemResult[0] || null,
       grn: grnResult[0]?.grn || null,
       supplierName: grnResult[0]?.supplierName || null,
-      quantitiesByLocation: quantities,
+      quantitiesByLocation: quantitiesWithPacks,
     };
   }
 

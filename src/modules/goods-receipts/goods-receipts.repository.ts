@@ -154,7 +154,9 @@ export class GoodsReceiptsRepository {
         id: batches.id,
         batchNo: batches.batchNo,
         expiryDate: batches.expiryDate,
+        packSize: batches.packSize,
         unitCost: batches.unitCost,
+        sellingPrice: batches.sellingPrice,
         quantityReceived: batches.quantityReceived,
         itemId: batches.itemId,
         itemName: items.name,
@@ -266,5 +268,74 @@ export class GoodsReceiptsRepository {
 
       return deleted;
     });
+  }
+
+  async updateGrn(id: string, data: {
+    receiptDate?: string;
+    taxPaid?: boolean;
+    paymentDueDateType?: string;
+    paymentDueDate?: string;
+    paymentMethod?: string;
+    totalCost?: number;
+    invoiceDocumentUrl?: string;
+  }) {
+    const updateData: Record<string, any> = {};
+    if (data.receiptDate !== undefined) updateData.receiptDate = data.receiptDate;
+    if (data.taxPaid !== undefined) updateData.taxPaid = data.taxPaid;
+    if (data.paymentDueDateType !== undefined) updateData.paymentDueDateType = data.paymentDueDateType;
+    if (data.paymentDueDate !== undefined) updateData.paymentDueDate = data.paymentDueDate;
+    if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
+    if (data.totalCost !== undefined) updateData.totalCost = String(data.totalCost);
+    if (data.invoiceDocumentUrl !== undefined) updateData.invoiceDocumentUrl = data.invoiceDocumentUrl;
+
+    if (Object.keys(updateData).length === 0) return null;
+
+    const [updated] = await this.databaseService.db
+      .update(goodsReceipts)
+      .set(updateData)
+      .where(eq(goodsReceipts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getBatchesByGrnId(grnId: string) {
+    return this.databaseService.db
+      .select()
+      .from(batches)
+      .where(eq(batches.grnId, grnId));
+  }
+
+  async getSoldQuantityForBatch(batchId: string): Promise<number> {
+    const result = await this.databaseService.db
+      .select({
+        total: sql<number>`coalesce(sum(${saleItems.quantity}), 0)`,
+      })
+      .from(saleItems)
+      .where(eq(saleItems.batchId, batchId));
+    return Number(result[0]?.total ?? 0);
+  }
+
+  async getTransferredQuantityForBatch(batchId: string): Promise<number> {
+    const result = await this.databaseService.db
+      .select({
+        total: sql<number>`coalesce(sum(${transfers.quantity}), 0)`,
+      })
+      .from(transfers)
+      .where(eq(transfers.batchId, batchId));
+    return Number(result[0]?.total ?? 0);
+  }
+
+  async getReceiptStockMovement(batchId: string) {
+    const result = await this.databaseService.db
+      .select()
+      .from(stockMovements)
+      .where(
+        and(
+          eq(stockMovements.batchId, batchId),
+          eq(stockMovements.type, 'receipt'),
+        )
+      )
+      .limit(1);
+    return result[0] || null;
   }
 }

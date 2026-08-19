@@ -110,7 +110,7 @@ describe('TransfersService', () => {
   describe('create', () => {
     const dto = {
       batchId: 'batch-1',
-      quantity: 10,
+      numberOfPacks: 2,
       fromLocationId: 'store-1',
       toLocationId: 'disp-1',
     };
@@ -121,15 +121,27 @@ describe('TransfersService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should reject non-integer quantity', async () => {
+    it('should reject non-integer numberOfPacks', async () => {
       await expect(
-        service.create({ ...dto, quantity: 1.5 } as any, 'user-1'),
+        service.create({ ...dto, numberOfPacks: 1.5 } as any, 'user-1'),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should reject zero quantity', async () => {
+    it('should reject zero numberOfPacks', async () => {
       await expect(
-        service.create({ ...dto, quantity: 0 }, 'user-1'),
+        service.create({ ...dto, numberOfPacks: 0 }, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject both numberOfPacks and quantity', async () => {
+      await expect(
+        service.create({ ...dto, numberOfPacks: 2, quantity: 5 }, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject neither numberOfPacks nor quantity', async () => {
+      await expect(
+        service.create({ batchId: 'batch-1', fromLocationId: 'store-1', toLocationId: 'disp-1' }, 'user-1'),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -159,13 +171,14 @@ describe('TransfersService', () => {
       );
     });
 
-    it('should create transfer in transaction', async () => {
+    it('should create transfer with packs', async () => {
       repository.findBatchById.mockResolvedValue(mockBatch);
       stockMovementsService.getCurrentQuantity.mockResolvedValue(100);
 
       const mockTransfer = {
         id: 'transfer-1',
         ...dto,
+        quantity: 20,
         transferredBy: 'user-1',
         createdAt: new Date(),
       };
@@ -175,13 +188,11 @@ describe('TransfersService', () => {
           insert: jest
             .fn()
             .mockReturnValueOnce({
-              // Call 1: transfers.insert — needs .returning()
               values: jest.fn().mockReturnValue({
                 returning: jest.fn().mockResolvedValue([mockTransfer]),
               }),
             })
             .mockReturnValue({
-              // Calls 2, 3: stockMovements.insert — just .values()
               values: jest.fn().mockResolvedValue(undefined),
             }),
         };
@@ -189,17 +200,68 @@ describe('TransfersService', () => {
       });
 
       stockMovementsService.getBatchQuantitiesByLocation.mockResolvedValue([
-        { locationId: 'store-1', quantity: 90 },
-        { locationId: 'disp-1', quantity: 10 },
+        { locationId: 'store-1', quantity: 80 },
+        { locationId: 'disp-1', quantity: 20, packSize: 10 },
       ]);
 
       const result = await service.create(dto, 'user-1');
 
       expect(result.id).toBe('transfer-1');
-      expect(result.quantities).toHaveLength(2);
+      expect(result.numberOfPacks).toBe(2);
+      expect(result.packSize).toBe(10);
+      expect(result.transferQuantity).toBe(20);
       expect(auditLog.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'create_transfer' }),
       );
+    });
+
+    it('should create transfer with exact quantity', async () => {
+      const batchWithPackSize = { ...mockBatch, packSize: 10 };
+      repository.findBatchById.mockResolvedValue(batchWithPackSize);
+      stockMovementsService.getCurrentQuantity.mockResolvedValue(100);
+
+      const mockTransfer = {
+        id: 'transfer-2',
+        batchId: 'batch-1',
+        quantity: 15,
+        fromLocationId: 'store-1',
+        toLocationId: 'disp-1',
+        transferredBy: 'user-1',
+        createdAt: new Date(),
+      };
+
+      databaseService.db.transaction.mockImplementation(async (fn: any) => {
+        const tx = {
+          insert: jest
+            .fn()
+            .mockReturnValueOnce({
+              values: jest.fn().mockReturnValue({
+                returning: jest.fn().mockResolvedValue([mockTransfer]),
+              }),
+            })
+            .mockReturnValue({
+              values: jest.fn().mockResolvedValue(undefined),
+            }),
+        };
+        return fn(tx);
+      });
+
+      stockMovementsService.getBatchQuantitiesByLocation.mockResolvedValue([
+        { locationId: 'store-1', quantity: 85, packSize: 10 },
+        { locationId: 'disp-1', quantity: 15, packSize: 10 },
+      ]);
+
+      const result = await service.create({
+        batchId: 'batch-1',
+        quantity: 15,
+        fromLocationId: 'store-1',
+        toLocationId: 'disp-1',
+      }, 'user-1');
+
+      expect(result.id).toBe('transfer-2');
+      expect(result.numberOfPacks).toBe(1);
+      expect(result.packSize).toBe(10);
+      expect(result.transferQuantity).toBe(15);
     });
   });
 

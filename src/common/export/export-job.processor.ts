@@ -71,13 +71,17 @@ export class ExportJobProcessor extends WorkerHost {
       case 'stock':
         data = await this.reportsRepository.getStockReportRaw();
         return {
-          columns: ['Item ID', 'Item Name', 'Store Qty', 'Dispatcher Qty', 'Total Qty', 'Total Value'],
+          columns: ['Item ID', 'Item Name', 'Pack Size', 'Store Qty (Units)', 'Store Packs', 'Dispatcher Qty (Units)', 'Dispatcher Packs', 'Total Qty (Units)', 'Total Packs', 'Total Value'],
           rows: data.map((item: Record<string, unknown>) => [
             String(item.itemId ?? ''),
             String(item.itemName ?? ''),
+            String(item.packSize ?? 1),
             String(item.storeQuantity ?? 0),
+            String(item.storePacks ?? 0),
             String(item.dispatcherQuantity ?? 0),
+            String(item.dispatcherPacks ?? 0),
             String(item.totalQuantity ?? 0),
+            String(item.totalPacks ?? 0),
             String(item.totalValueAtCost ?? 0),
           ]),
         };

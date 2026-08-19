@@ -46,7 +46,9 @@ describe('GoodsReceiptsService', () => {
     grnId: 'grn-1',
     batchNo: 'BATCH-001',
     expiryDate: '2027-08-03',
+    packSize: 1,
     unitCost: '10',
+    sellingPrice: '15',
     quantityReceived: 100,
     qrCodeUrl: null,
     createdAt: new Date(),
@@ -139,8 +141,10 @@ describe('GoodsReceiptsService', () => {
           itemId: 'item-1',
           batchNo: 'BATCH-001',
           expiryDate: '2027-08-03',
-          quantityReceived: 100,
-          unitCost: 10,
+          numberOfPacks: 10,
+          packSize: 5,
+          unitCost: 400,
+          sellingPrice: 120,
         },
       ],
     };
@@ -169,7 +173,7 @@ describe('GoodsReceiptsService', () => {
     it('should reject zero quantity', async () => {
       const dto = {
         ...createDto,
-        items: [{ ...createDto.items[0], quantityReceived: 0 }],
+        items: [{ ...createDto.items[0], numberOfPacks: 0 }],
       };
       await expect(service.create(dto, undefined, 'user-1')).rejects.toThrow(
         BadRequestException,
@@ -222,7 +226,7 @@ describe('GoodsReceiptsService', () => {
       await service.create(createDto, undefined, 'user-1');
 
       // The transaction should have been called — totalCost is computed
-      // as 100 * 10 = 1000 and passed inside the transaction
+      // as 10 packs * 400 cost per pack = 4000
       expect(databaseService.db.transaction).toHaveBeenCalled();
     });
 

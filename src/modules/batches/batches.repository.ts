@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../db/database.service';
-import { batches, stockMovements } from '../../db';
+import { batches, stockMovements, items } from '../../db';
 import { eq, and, sql, SQL, count, asc } from 'drizzle-orm';
 import { paginate, PaginatedResponse } from '../../common/pagination';
 
@@ -29,8 +29,13 @@ export class BatchesRepository {
       );
     }
     if (params.search) {
+      const searchTerm = `%${params.search}%`;
       conditions.push(
-        sql`${batches.batchNo} ILIKE ${`%${params.search}%`}`,
+        sql`(
+          ${batches.batchNo} ILIKE ${searchTerm}
+          OR ${items.name} ILIKE ${searchTerm}
+          OR ${items.genericName} ILIKE ${searchTerm}
+        )`,
       );
     }
 
@@ -44,6 +49,7 @@ export class BatchesRepository {
     const countQuery = this.databaseService.db
       .select({ count: count() })
       .from(batches)
+      .innerJoin(items, eq(batches.itemId, items.id))
       .where(whereClause);
 
     const ALLOWED_SORT_FIELDS: Record<string, any> = {
@@ -52,6 +58,7 @@ export class BatchesRepository {
       createdAt: batches.createdAt,
       unitCost: batches.unitCost,
       quantityReceived: batches.quantityReceived,
+      itemName: items.name,
     };
 
     const col = params.sortBy ? ALLOWED_SORT_FIELDS[params.sortBy] : undefined;
@@ -69,6 +76,8 @@ export class BatchesRepository {
         quantityReceived: batches.quantityReceived,
         qrCodeUrl: batches.qrCodeUrl,
         createdAt: batches.createdAt,
+        itemName: items.name,
+        genericName: items.genericName,
         quantities: sql<string>`COALESCE(
           (SELECT json_agg(json_build_object('locationId', sm.location_id, 'quantity', sm.total))
            FROM (SELECT sm2.location_id, SUM(sm2.quantity) as total
@@ -78,8 +87,13 @@ export class BatchesRepository {
         )`,
       })
       .from(batches)
+      .innerJoin(items, eq(batches.itemId, items.id))
       .where(whereClause)
-      .orderBy(params.sortOrder === 'desc' ? sql`${orderCol} desc` : asc(orderCol));
+      .orderBy(
+        params.search
+          ? sql`CASE WHEN ${items.name} ILIKE ${`%${params.search}%`} THEN 0 WHEN ${items.genericName} ILIKE ${`%${params.search}%`} THEN 1 ELSE 2 END, ${orderCol} asc`
+          : params.sortOrder === 'desc' ? sql`${orderCol} desc` : asc(orderCol)
+      );
 
     return paginate<any>({
       db: this.databaseService.db,
@@ -142,5 +156,42 @@ export class BatchesRepository {
       .update(batches)
       .set({ qrCodeUrl })
       .where(eq(batches.id, id));
+  }
+
+  async update(id: string, data: {
+    batchNo?: string;
+    expiryDate?: string;
+    packSize?: number;
+    unitCost?: number;
+    sellingPrice?: number;
+    quantityReceived?: number;
+  }) {
+    const updateData: Record<string, any> = {};
+    if (data.batchNo !== undefined) updateData.batchNo = data.batchNo;
+    if (data.expiryDate !== undefined) updateData.expiryDate = data.expiryDate;
+    if (data.packSize !== undefined) updateData.packSize = data.packSize;
+    if (data.unitCost !== undefined) updateData.unitCost = String(data.unitCost);
+    if (data.sellingPrice !== undefined) updateData.sellingPrice = String(data.sellingPrice);
+    if (data.quantityReceived !== undefined) updateData.quantityReceived = data.quantityReceived;
+
+    if (Object.keys(updateData).length === 0) return null;
+
+    const [updated] = await this.databaseService.db
+      .update(batches)
+      .set(updateData)
+      .where(eq(batches.id, id))
+      .returning();
+    return updated;
+  }
+
+  async findExistingBatchNosExcept(batchNos: string[], excludeIds: string[]) {
+    if (batchNos.length === 0) return [];
+    const result = await this.databaseService.db
+      .select({ batchNo: batches.batchNo })
+      .from(batches)
+      .where(
+        sql`${batches.batchNo} IN ${batchNos} AND ${batches.id} NOT IN ${excludeIds}`
+      );
+    return result.map((r) => r.batchNo);
   }
 }

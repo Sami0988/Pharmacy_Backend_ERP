@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Delete,
   Param,
   Body,
@@ -24,6 +25,7 @@ import {
 } from '@nestjs/swagger';
 import { GoodsReceiptsService } from './goods-receipts.service';
 import { CreateGoodsReceiptDto } from './dto/create-goods-receipt.dto';
+import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
 import { GoodsReceiptItemDto } from './dto/goods-receipt-item.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -200,6 +202,83 @@ export class GoodsReceiptsController {
   @ApiResponse({ status: 404, description: 'GRN not found' })
   findOne(@Param('id') id: string) {
     return this.service.findById(id);
+  }
+
+  @Patch(':id')
+  @Roles('admin', 'store_keeper')
+  @UseInterceptors(
+    FileInterceptor('invoiceDocument', {
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
+        if (!allowed.includes(file.mimetype)) {
+          return cb(
+            new BadRequestException('Invoice file must be PDF, JPG, or PNG'),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update a goods receipt and its batch items' })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'id', description: 'GRN UUID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        invoiceDocument: {
+          type: 'string',
+          format: 'binary',
+          description: 'Optional new invoice file (PDF, JPG, PNG, max 10MB)',
+        },
+        receiptDate: { type: 'string', example: '2026-08-15' },
+        taxPaid: { type: 'boolean' },
+        paymentDueDateType: {
+          type: 'string',
+          enum: ['one_month', 'two_months', 'six_months', 'one_year', 'other'],
+        },
+        paymentDueDate: { type: 'string', format: 'date' },
+        paymentMethod: {
+          type: 'string',
+          enum: ['cash', 'credit', 'mobile_bank'],
+        },
+        items: { type: 'string', description: 'JSON array of batch items to update. Each item must include batchId.' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'GRN updated successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 404, description: 'GRN not found' })
+  async update(
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser('sub') userId: string,
+  ) {
+    if (!userId) {
+      throw new BadRequestException('Current user identifier is required');
+    }
+
+    const itemsValue = body.items;
+    const items = itemsValue
+      ? typeof itemsValue === 'string'
+        ? JSON.parse(itemsValue)
+        : itemsValue
+      : undefined;
+
+    const dto: UpdateGoodsReceiptDto = {
+      receiptDate: body.receiptDate as string | undefined,
+      taxPaid: body.taxPaid as boolean | undefined,
+      paymentDueDateType: body.paymentDueDateType as 'one_month' | 'two_months' | 'six_months' | 'one_year' | 'other' | undefined,
+      paymentDueDate: body.paymentDueDate as string | undefined,
+      paymentMethod: body.paymentMethod as 'cash' | 'credit' | 'mobile_bank' | undefined,
+      items,
+    };
+
+    return this.service.update(id, dto, file, userId);
   }
 
   @Get(':id/invoice-url')

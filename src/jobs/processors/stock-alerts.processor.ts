@@ -160,10 +160,11 @@ export class StockAlertsProcessor extends WorkerHost {
             const timeLabel = threshold.days >= 30
               ? `${Math.round(threshold.days / 30)} month${Math.round(threshold.days / 30) > 1 ? 's' : ''}`
               : `${threshold.days} days`;
+            const packInfo = batch.packSize > 1 ? ` (${Math.ceil(totalQty / batch.packSize)} packs of ${batch.packSize})` : '';
             await this.notificationsService.createNotification({
               type: 'near_expiry',
               title: 'Near-Expiry Warning',
-              message: `Batch ${batch.batchNo} of ${batch.itemName} expires in ${timeLabel} (${totalQty} units remaining).`,
+              message: `Batch ${batch.batchNo} of ${batch.itemName} expires in ${timeLabel} — ${totalQty} units remaining${packInfo}.`,
               itemId: batch.itemId,
               batchId: batch.batchId,
               thresholdDays: threshold.days,
@@ -192,10 +193,11 @@ export class StockAlertsProcessor extends WorkerHost {
       if (existing) continue;
 
       const totalQty = await this.getBatchTotalQuantity(batch.batchId);
+      const packInfo = batch.packSize > 1 ? ` (${Math.ceil(totalQty / batch.packSize)} packs of ${batch.packSize})` : '';
       await this.notificationsService.createNotification({
         type: 'expired',
         title: 'Expired Batch',
-        message: `Batch ${batch.batchNo} of ${batch.itemName} expired on ${batch.expiryDate} — ${totalQty} units still in stock and must be removed from sale.`,
+        message: `Batch ${batch.batchNo} of ${batch.itemName} expired on ${batch.expiryDate} — ${totalQty} units still in stock${packInfo} and must be removed from sale.`,
         itemId: batch.itemId,
         batchId: batch.batchId,
       });
@@ -330,13 +332,14 @@ export class StockAlertsProcessor extends WorkerHost {
         batchId: batches.id,
         batchNo: batches.batchNo,
         expiryDate: sql<string>`to_char(${batches.expiryDate}, 'YYYY-MM-DD')`,
+        packSize: batches.packSize,
         itemId: batches.itemId,
         itemName: items.name,
       })
       .from(batches)
       .innerJoin(items, eq(batches.itemId, items.id))
       .innerJoin(stockMovements, eq(stockMovements.batchId, batches.id))
-      .groupBy(batches.id, batches.batchNo, batches.expiryDate, batches.itemId, items.name)
+      .groupBy(batches.id, batches.batchNo, batches.expiryDate, batches.packSize, batches.itemId, items.name)
       .having(sql`coalesce(sum(${stockMovements.quantity}), 0) > 0`);
 
     return result;

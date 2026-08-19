@@ -53,19 +53,24 @@ export class GoodsReceiptItemDto {
   @IsDateString()
   expiryDate: string;
 
-  @ApiProperty({ example: 100, description: 'Quantity received' })
+  @ApiProperty({ example: 10, description: 'Number of packs received' })
   @IsInt()
   @IsPositive()
-  quantityReceived: number;
+  numberOfPacks: number;
 
-  @ApiProperty({ example: 10.5, description: 'Cost per unit' })
+  @ApiProperty({ example: 5, description: 'Number of individual units per pack (e.g., 5 tablets per pack)' })
+  @IsInt()
+  @IsPositive()
+  packSize: number;
+
+  @ApiProperty({ example: 400, description: 'Cost per pack (not per unit)' })
   @IsPositive()
   unitCost: number;
 
   @ApiPropertyOptional({
-    example: 15.0,
+    example: 120,
     description:
-      'Selling price per unit (provide this OR markupPercentage, not both)',
+      'Selling price per individual unit (provide this OR markupPercentage, not both)',
   })
   @IsNumber()
   @Min(0)
@@ -73,10 +78,10 @@ export class GoodsReceiptItemDto {
   sellingPrice?: number;
 
   @ApiPropertyOptional({
-    example: 30,
+    example: 50,
     enum: [10, 20, 30, 40, 50],
     description:
-      'Markup percentage on unit cost (provide this OR sellingPrice, not both). Options: 10, 20, 30, 40, 50',
+      'Markup percentage on per-unit cost (provide this OR sellingPrice, not both). Options: 10, 20, 30, 40, 50',
   })
   @IsIn(MARKUP_PERCENTAGES, {
     message: 'markupPercentage must be one of: 10, 20, 30, 40, 50',

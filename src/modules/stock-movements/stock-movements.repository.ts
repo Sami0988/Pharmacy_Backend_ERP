@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../../db/database.service';
-import { stockMovements } from '../../db';
+import { stockMovements, batches } from '../../db';
 import { eq, and, sql } from 'drizzle-orm';
 
 @Injectable()
@@ -67,10 +67,12 @@ export class StockMovementsRepository {
       .select({
         locationId: stockMovements.locationId,
         quantity: sql<number>`coalesce(sum(${stockMovements.quantity}), 0)`,
+        packSize: batches.packSize,
       })
       .from(stockMovements)
+      .innerJoin(batches, eq(stockMovements.batchId, batches.id))
       .where(eq(stockMovements.batchId, batchId))
-      .groupBy(stockMovements.locationId);
+      .groupBy(stockMovements.locationId, batches.packSize);
     return result;
   }
 

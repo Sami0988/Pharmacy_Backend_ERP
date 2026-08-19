@@ -113,7 +113,7 @@ describe('BatchesService', () => {
     it('should return batch with item, GRN, and quantities', async () => {
       repository.findById.mockResolvedValue(mockBatch as any);
       stockMovementsService.getBatchQuantitiesByLocation.mockResolvedValue([
-        { locationId: 'loc-1', quantity: 100 },
+        { locationId: 'loc-1', quantity: 100, packSize: 10 },
       ]);
 
       const result = await service.findById('batch-1');
@@ -122,7 +122,7 @@ describe('BatchesService', () => {
       expect(result.item).toEqual(mockItem);
       expect(result.supplierName).toBe('MedSupply Co.');
       expect(result.quantitiesByLocation).toEqual([
-        { locationId: 'loc-1', quantity: 100 },
+        { locationId: 'loc-1', quantity: 100, packSize: 10, numberOfPacks: 10 },
       ]);
     });
 

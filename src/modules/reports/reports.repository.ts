@@ -28,6 +28,10 @@ export class ReportsRepository {
     totalQuantity: number;
     totalValueAtCost: number;
     sellingPrice: number;
+    packSize: number;
+    storePacks: number;
+    dispatcherPacks: number;
+    totalPacks: number;
   }>> {
     const result = await this.databaseService.db
       .select({
@@ -37,6 +41,15 @@ export class ReportsRepository {
         dispatcherQuantity: sql<number>`coalesce(sum(case when ${locations.name} = 'Dispatcher' then ${stockMovements.quantity} else 0 end), 0)`,
         totalQuantity: sql<number>`coalesce(sum(${stockMovements.quantity}), 0)`,
         avgCost: sql<number>`coalesce(avg(cast(${batches.unitCost} as decimal)), 0)`,
+        packSize: sql<number>`coalesce((
+          select b2.pack_size from batches b2
+          inner join stock_movements sm2 on sm2.batch_id = b2.id
+          inner join locations l2 on sm2.location_id = l2.id
+          where b2.item_id = ${items.id} and l2.name in ('Store', 'Dispatcher')
+          group by b2.id, b2.pack_size
+          order by sum(sm2.quantity) desc
+          limit 1
+        ), 1)`,
         sellingPrice: sql<string>`coalesce((
           select b2.selling_price from batches b2
           inner join stock_movements sm2 on sm2.batch_id = b2.id
@@ -63,6 +76,10 @@ export class ReportsRepository {
       dispatcherQuantity: Number(r.dispatcherQuantity),
       totalQuantity: Number(r.totalQuantity),
       totalValueAtCost: Math.round(Number(r.totalQuantity) * Number(r.avgCost) * 100) / 100,
+      packSize: Number(r.packSize),
+      storePacks: Math.floor(Number(r.storeQuantity) / Number(r.packSize)),
+      dispatcherPacks: Math.floor(Number(r.dispatcherQuantity) / Number(r.packSize)),
+      totalPacks: Math.floor(Number(r.totalQuantity) / Number(r.packSize)),
       sellingPrice: Number(r.sellingPrice),
     }));
   }
@@ -82,6 +99,15 @@ export class ReportsRepository {
         dispatcherQuantity: sql<number>`coalesce(sum(case when ${locations.name} = 'Dispatcher' then ${stockMovements.quantity} else 0 end), 0)`,
         totalQuantity: sql<number>`coalesce(sum(${stockMovements.quantity}), 0)`,
         avgCost: sql<number>`coalesce(avg(cast(${batches.unitCost} as decimal)), 0)`,
+        packSize: sql<number>`coalesce((
+          select b2.pack_size from batches b2
+          inner join stock_movements sm2 on sm2.batch_id = b2.id
+          inner join locations l2 on sm2.location_id = l2.id
+          where b2.item_id = ${items.id} and l2.name in ('Store', 'Dispatcher')
+          group by b2.id, b2.pack_size
+          order by sum(sm2.quantity) desc
+          limit 1
+        ), 1)`,
         sellingPrice: sql<string>`coalesce((
           select b2.selling_price from batches b2
           inner join stock_movements sm2 on sm2.batch_id = b2.id
@@ -123,6 +149,7 @@ export class ReportsRepository {
       dispatcherQuantity: number;
       totalQuantity: number;
       avgCost: number;
+      packSize: number;
       sellingPrice: string;
     }>({
       db: this.databaseService.db,
@@ -141,6 +168,10 @@ export class ReportsRepository {
         dispatcherQuantity: Number(r.dispatcherQuantity),
         totalQuantity: Number(r.totalQuantity),
         totalValueAtCost: Math.round(Number(r.totalQuantity) * Number(r.avgCost) * 100) / 100,
+        packSize: Number(r.packSize),
+        storePacks: Math.floor(Number(r.storeQuantity) / Number(r.packSize)),
+        dispatcherPacks: Math.floor(Number(r.dispatcherQuantity) / Number(r.packSize)),
+        totalPacks: Math.floor(Number(r.totalQuantity) / Number(r.packSize)),
         sellingPrice: Number(r.sellingPrice),
       })),
     };
@@ -159,6 +190,7 @@ export class ReportsRepository {
         batchId: batches.id,
         batchNo: batches.batchNo,
         expiryDate: batches.expiryDate,
+        packSize: batches.packSize,
         unitCost: batches.unitCost,
         itemId: items.id,
         itemName: items.name,
@@ -173,6 +205,7 @@ export class ReportsRepository {
         batches.id,
         batches.batchNo,
         batches.expiryDate,
+        batches.packSize,
         batches.unitCost,
         items.id,
         items.name,
@@ -194,6 +227,7 @@ export class ReportsRepository {
             batches.id,
             batches.batchNo,
             batches.expiryDate,
+            batches.packSize,
             batches.unitCost,
             items.id,
             items.name,
@@ -210,6 +244,7 @@ export class ReportsRepository {
         batchId: string;
         batchNo: string;
         expiryDate: string;
+        packSize: number;
         unitCost: string;
         itemId: string;
         itemName: string;
@@ -232,6 +267,7 @@ export class ReportsRepository {
           itemName: r.itemName,
           locationName: locationNames.get(r.locationId) ?? 'Unknown',
           quantity: Number(r.quantity),
+          packSize: r.packSize,
           unitCost: parseFloat(r.unitCost),
           isExpired: r.expiryDate < today,
         })),
@@ -248,6 +284,7 @@ export class ReportsRepository {
         itemName: r.itemName,
         locationName: locationNames.get(r.locationId) ?? 'Unknown',
         quantity: Number(r.quantity),
+        packSize: r.packSize,
         unitCost: parseFloat(r.unitCost),
         isExpired: r.expiryDate < today,
       })),
@@ -468,6 +505,7 @@ export class ReportsRepository {
         itemId: batches.itemId,
         itemName: items.name,
         expiryDate: batches.expiryDate,
+        packSize: batches.packSize,
         unitCost: batches.unitCost,
         sellingPrice: batches.sellingPrice,
         quantity: sql<number>`coalesce(sum(${stockMovements.quantity}), 0)`,
@@ -481,6 +519,7 @@ export class ReportsRepository {
         batches.batchNo,
         batches.itemId,
         batches.expiryDate,
+        batches.packSize,
         batches.unitCost,
         batches.sellingPrice,
         items.name,
@@ -494,6 +533,7 @@ export class ReportsRepository {
       itemId: r.itemId,
       itemName: r.itemName,
       expiryDate: r.expiryDate,
+      packSize: r.packSize,
       unitCost: Number(r.unitCost),
       sellingPrice: Number(r.sellingPrice),
       quantity: Number(r.quantity),

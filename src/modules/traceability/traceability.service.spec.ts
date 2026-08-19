@@ -106,7 +106,7 @@ describe('TraceabilityService', () => {
     it('should return trace data for matching batch', async () => {
       repository.findByBatchNo.mockResolvedValue([mockBatchRow]);
       stockMovementsService.getBatchQuantitiesByLocation.mockResolvedValue([
-        { locationId: 'loc-1', quantity: 85 },
+        { locationId: 'loc-1', quantity: 85, packSize: 10 },
       ]);
       repository.getTotalSold.mockResolvedValue(15);
       repository.getSalesHistory.mockResolvedValue([]);
@@ -229,7 +229,7 @@ describe('TraceabilityService', () => {
     it('should return trace data for batch by ID', async () => {
       repository.findById.mockResolvedValue(mockBatchRow);
       stockMovementsService.getBatchQuantitiesByLocation.mockResolvedValue([
-        { locationId: 'loc-1', quantity: 50 },
+        { locationId: 'loc-1', quantity: 50, packSize: 10 },
       ]);
       repository.getTotalSold.mockResolvedValue(50);
       repository.getSalesHistory.mockResolvedValue([]);
@@ -259,8 +259,8 @@ describe('TraceabilityService', () => {
     it('should return recall impact with current stock and sales', async () => {
       repository.findById.mockResolvedValue(mockBatchRow);
       stockMovementsService.getBatchQuantitiesByLocation.mockResolvedValue([
-        { locationId: 'store-1', quantity: 30 },
-        { locationId: 'disp-1', quantity: 10 },
+        { locationId: 'store-1', quantity: 30, packSize: 10 },
+        { locationId: 'disp-1', quantity: 10, packSize: 5 },
       ]);
       repository.getTotalSold.mockResolvedValue(60);
       repository.getSalesHistory.mockResolvedValue([

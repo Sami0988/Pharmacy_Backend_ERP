@@ -14,9 +14,13 @@ export class ReportsService {
     const result = await this.repository.getStockReport(params, search);
     if (format === 'csv') return { data: result.data, columns: [
       { key: 'itemName', header: 'Item' },
-      { key: 'storeQuantity', header: 'Store Qty' },
-      { key: 'dispatcherQuantity', header: 'Dispatcher Qty' },
-      { key: 'totalQuantity', header: 'Total Qty' },
+      { key: 'packSize', header: 'Pack Size' },
+      { key: 'storeQuantity', header: 'Store Qty (Units)' },
+      { key: 'storePacks', header: 'Store Packs' },
+      { key: 'dispatcherQuantity', header: 'Dispatcher Qty (Units)' },
+      { key: 'dispatcherPacks', header: 'Dispatcher Packs' },
+      { key: 'totalQuantity', header: 'Total Qty (Units)' },
+      { key: 'totalPacks', header: 'Total Packs' },
       { key: 'totalValueAtCost', header: 'Value at Cost' },
     ]};
     return result;
@@ -30,7 +34,8 @@ export class ReportsService {
       { key: 'batchNo', header: 'Batch No' },
       { key: 'expiryDate', header: 'Expiry Date' },
       { key: 'locationName', header: 'Location' },
-      { key: 'quantity', header: 'Quantity' },
+      { key: 'quantity', header: 'Quantity (Units)' },
+      { key: 'packSize', header: 'Pack Size' },
       { key: 'unitCost', header: 'Unit Cost' },
       { key: 'isExpired', header: 'Expired' },
     ]};

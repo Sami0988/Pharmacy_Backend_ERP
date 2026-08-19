@@ -97,8 +97,15 @@ export class TransfersService {
       );
     }
 
-    if (!Number.isInteger(dto.quantity) || dto.quantity <= 0) {
-      throw new BadRequestException('Quantity must be a positive integer');
+    const hasPacks = dto.numberOfPacks !== undefined && dto.numberOfPacks !== null;
+    const hasQty = dto.quantity !== undefined && dto.quantity !== null;
+
+    if (!hasPacks && !hasQty) {
+      throw new BadRequestException('Either numberOfPacks or quantity must be provided');
+    }
+
+    if (hasPacks && hasQty) {
+      throw new BadRequestException('Only one of numberOfPacks or quantity can be provided, not both');
     }
 
     const batch = await this.repository.findBatchById(dto.batchId);
@@ -113,14 +120,32 @@ export class TransfersService {
       );
     }
 
+    const packSize = batch.packSize ?? 1;
+    let transferQuantity: number;
+    let numberOfPacks: number;
+
+    if (hasPacks) {
+      if (!Number.isInteger(dto.numberOfPacks) || dto.numberOfPacks <= 0) {
+        throw new BadRequestException('Number of packs must be a positive integer');
+      }
+      numberOfPacks = dto.numberOfPacks;
+      transferQuantity = numberOfPacks * packSize;
+    } else {
+      if (!Number.isInteger(dto.quantity) || dto.quantity <= 0) {
+        throw new BadRequestException('Quantity must be a positive integer');
+      }
+      transferQuantity = dto.quantity;
+      numberOfPacks = Math.floor(transferQuantity / packSize);
+    }
+
     const currentQuantity = await this.stockMovementsService.getCurrentQuantity(
       dto.batchId,
       fromLocationId,
     );
 
-    if (currentQuantity < dto.quantity) {
+    if (currentQuantity < transferQuantity) {
       throw new BadRequestException(
-        `Insufficient stock at source location. Available: ${currentQuantity}, Requested: ${dto.quantity}`,
+        `Insufficient stock at source location. Available: ${currentQuantity} units, Requested: ${transferQuantity} units (${dto.numberOfPacks} packs × ${packSize} units/pack)`,
       );
     }
 
@@ -129,7 +154,7 @@ export class TransfersService {
         .insert(transfers)
         .values({
           batchId: dto.batchId,
-          quantity: dto.quantity,
+          quantity: transferQuantity,
           fromLocationId,
           toLocationId,
           transferredBy: userId,
@@ -140,7 +165,7 @@ export class TransfersService {
         batchId: dto.batchId,
         locationId: fromLocationId,
         type: 'transfer_out',
-        quantity: -dto.quantity,
+        quantity: -transferQuantity,
         refId: transferRow.id,
         refType: 'transfer',
         createdBy: userId,
@@ -150,7 +175,7 @@ export class TransfersService {
         batchId: dto.batchId,
         locationId: toLocationId,
         type: 'transfer_in',
-        quantity: dto.quantity,
+        quantity: transferQuantity,
         refId: transferRow.id,
         refType: 'transfer',
         createdBy: userId,
@@ -171,7 +196,9 @@ export class TransfersService {
       entityId: result.id,
       afterData: {
         batchId: dto.batchId,
-        quantity: dto.quantity,
+        numberOfPacks,
+        packSize,
+        transferQuantity,
         fromLocationId,
         toLocationId,
       },
@@ -184,12 +211,15 @@ export class TransfersService {
         dto.batchId,
         fromLocationId,
         toLocationId,
-        dto.quantity,
+        transferQuantity,
       ),
     );
 
     return {
       ...result,
+      numberOfPacks,
+      packSize,
+      transferQuantity,
       quantities,
     };
   }

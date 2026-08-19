@@ -27,6 +27,7 @@ export const batches = pgTable(
       .references(() => goodsReceipts.id),
     batchNo: text('batch_no').notNull(),
     expiryDate: date('expiry_date').notNull(),
+    packSize: integer('pack_size').notNull().default(1),
     unitCost: decimal('unit_cost').notNull(),
     sellingPrice: decimal('selling_price').notNull(),
     quantityReceived: integer('quantity_received').notNull(),

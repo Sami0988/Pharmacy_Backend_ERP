@@ -23,7 +23,9 @@ export interface FefoSuggestionItem {
   batchId: string;
   batchNo: string;
   expiryDate: string;
+  packSize: number;
   availableQuantity: number;
+  availablePacks: number;
   daysUntilExpiry: number;
 }
 

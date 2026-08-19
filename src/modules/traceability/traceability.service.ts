@@ -142,15 +142,18 @@ export class TraceabilityService {
   }
 
   private async buildCurrentStock(
-    quantities: Array<{ locationId: string; quantity: number }>,
+    quantities: Array<{ locationId: string; quantity: number; packSize: number }>,
   ) {
-    const results: Array<{ locationId: string; locationName: string; quantity: number }> = [];
+    const results: Array<{ locationId: string; locationName: string; quantity: number; packSize: number; numberOfPacks: number }> = [];
     for (const q of quantities) {
       const locationName = await this.getLocationNameById(q.locationId);
+      const packSize = q.packSize ?? 1;
       results.push({
         locationId: q.locationId,
         locationName: locationName ?? 'Unknown',
         quantity: q.quantity,
+        packSize,
+        numberOfPacks: Math.floor(q.quantity / packSize),
       });
     }
     return results;

@@ -44,7 +44,7 @@ describe('SalesService', () => {
 
   const mockDispatcherLocation = { id: 'disp-1', branchId: 'branch-1', name: 'Dispatcher', createdAt: new Date() };
   const mockItem = { id: 'item-1', name: 'Paracetamol 500mg', genericName: 'Paracetamol', category: 'Analgesics', unit: 'tablet', strength: '500mg', sellingPrice: '5000', reorderLevel: 10, isControlledSubstance: false, createdAt: new Date() };
-  const mockBatch = { id: 'batch-1', itemId: 'item-1', grnId: 'grn-1', batchNo: 'BATCH-001', expiryDate: futureDate, unitCost: '3000', quantityReceived: 100, qrCodeUrl: null, createdAt: new Date() };
+  const mockBatch = { id: 'batch-1', itemId: 'item-1', grnId: 'grn-1', batchNo: 'BATCH-001', expiryDate: futureDate, packSize: 1, unitCost: '3000', sellingPrice: '5000', quantityReceived: 100, qrCodeUrl: null, createdAt: new Date() };
   const mockSale = { id: 'sale-1', branchId: 'branch-1', customerId: null, soldBy: 'user-1', totalAmount: '10000', paymentMethod: 'cash', receiptUrl: null, receiptGenerated: true, createdAt: new Date() };
   const mockSaleItem = { id: 'si-1', saleId: 'sale-1', batchId: 'batch-1', quantity: 2, unitPrice: '5000', createdAt: new Date() };
 

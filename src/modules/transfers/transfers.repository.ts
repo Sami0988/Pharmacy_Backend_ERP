@@ -54,6 +54,7 @@ export class TransfersRepository {
         batchId: batches.id,
         batchNo: batches.batchNo,
         expiryDate: batches.expiryDate,
+        packSize: batches.packSize,
         availableQuantity: sql<number>`
           coalesce(sum(${stockMovements.quantity}), 0)
         `,
@@ -67,7 +68,7 @@ export class TransfersRepository {
           gte(batches.expiryDate, today),
         ),
       )
-      .groupBy(batches.id, batches.batchNo, batches.expiryDate)
+      .groupBy(batches.id, batches.batchNo, batches.expiryDate, batches.packSize)
       .having(sql`coalesce(sum(${stockMovements.quantity}), 0) > 0`)
       .orderBy(sql`${batches.expiryDate} asc`);
 
@@ -76,12 +77,15 @@ export class TransfersRepository {
       const now = new Date();
       const diffMs = expiryDate.getTime() - now.getTime();
       const daysUntilExpiry = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      const packSize = r.packSize ?? 1;
 
       return {
         batchId: r.batchId,
         batchNo: r.batchNo,
         expiryDate: r.expiryDate,
+        packSize,
         availableQuantity: r.availableQuantity,
+        availablePacks: Math.floor(r.availableQuantity / packSize),
         daysUntilExpiry,
       };
     });
@@ -113,6 +117,7 @@ export class TransfersRepository {
         createdAt: transfers.createdAt,
         batchNo: batches.batchNo,
         expiryDate: batches.expiryDate,
+        packSize: batches.packSize,
         itemName: items.name,
         itemId: items.id,
         fromLocationName: locations.name,
@@ -132,8 +137,11 @@ export class TransfersRepository {
       .where(eq(locations.id, result[0].toLocationId))
       .limit(1);
 
+    const packSize = result[0].packSize ?? 1;
     return {
       ...result[0],
+      packSize,
+      numberOfPacks: Math.floor(result[0].quantity / packSize),
       toLocationName: toLocation[0]?.name ?? 'Unknown',
     };
   }
@@ -203,6 +211,7 @@ export class TransfersRepository {
         transferredBy: transfers.transferredBy,
         createdAt: transfers.createdAt,
         batchNo: batches.batchNo,
+        packSize: batches.packSize,
         itemName: items.name,
         itemId: items.id,
         fromLocationName: locations.name,

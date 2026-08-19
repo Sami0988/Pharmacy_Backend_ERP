@@ -16,6 +16,7 @@ import { DatabaseService } from '../../db/database.service';
 import { locations, goodsReceipts, batches, stockMovements } from '../../db';
 import { eq } from 'drizzle-orm';
 import { CreateGoodsReceiptDto } from './dto/create-goods-receipt.dto';
+import { UpdateGoodsReceiptDto } from './dto/update-goods-receipt.dto';
 import { PaginatedResponse } from '../../common/pagination';
 
 @Injectable()
@@ -48,9 +49,14 @@ export class GoodsReceiptsService {
           `Batch ${item.batchNo}: expiry date must be in the future`,
         );
       }
-      if (item.quantityReceived <= 0) {
+      if (!item.numberOfPacks || item.numberOfPacks <= 0) {
         throw new BadRequestException(
-          `Batch ${item.batchNo}: quantity must be positive`,
+          `Batch ${item.batchNo}: numberOfPacks must be positive`,
+        );
+      }
+      if (!item.packSize || item.packSize <= 0) {
+        throw new BadRequestException(
+          `Batch ${item.batchNo}: packSize must be positive`,
         );
       }
       if (item.unitCost <= 0) {
@@ -68,9 +74,10 @@ export class GoodsReceiptsService {
           `Batch ${item.batchNo}: provide either sellingPrice or markupPercentage, not both`,
         );
       }
-      if (item.sellingPrice !== undefined && item.sellingPrice < item.unitCost) {
+      const costPerUnit = item.unitCost / item.packSize;
+      if (item.sellingPrice !== undefined && item.sellingPrice < costPerUnit) {
         throw new BadRequestException(
-          `Batch ${item.batchNo}: selling price (${item.sellingPrice}) cannot be less than unit cost (${item.unitCost})`,
+          `Batch ${item.batchNo}: selling price (${item.sellingPrice}) cannot be less than per-unit cost (${costPerUnit})`,
         );
       }
     }
@@ -121,7 +128,7 @@ export class GoodsReceiptsService {
     }
 
     const totalCost = dto.items.reduce(
-      (sum, item) => sum + item.quantityReceived * item.unitCost,
+      (sum, item) => sum + item.numberOfPacks * item.unitCost,
       0,
     );
 
@@ -164,10 +171,12 @@ export class GoodsReceiptsService {
         const storeLocationId = storeLocation[0].id;
 
         for (const item of dto.items) {
+          const totalUnits = item.numberOfPacks * item.packSize;
+          const costPerUnit = item.unitCost / item.packSize;
           const sellingPrice =
             item.sellingPrice !== undefined
               ? item.sellingPrice
-              : Math.round(item.unitCost * (1 + item.markupPercentage! / 100) * 100) / 100;
+              : Math.round(costPerUnit * (1 + item.markupPercentage! / 100) * 100) / 100;
 
           const [batch] = await tx
             .insert(batches)
@@ -176,9 +185,10 @@ export class GoodsReceiptsService {
               grnId: grnRow.id,
               batchNo: item.batchNo,
               expiryDate: item.expiryDate,
-              unitCost: String(item.unitCost),
+              packSize: item.packSize,
+              unitCost: String(costPerUnit),
               sellingPrice: String(sellingPrice),
-              quantityReceived: item.quantityReceived,
+              quantityReceived: totalUnits,
             })
             .returning();
 
@@ -186,7 +196,7 @@ export class GoodsReceiptsService {
             batchId: batch.id,
             locationId: storeLocationId,
             type: 'receipt',
-            quantity: item.quantityReceived,
+            quantity: totalUnits,
             refId: grnRow.id,
             refType: 'goods_receipt',
             createdBy: userId,
@@ -297,6 +307,199 @@ export class GoodsReceiptsService {
     });
 
     return { message: 'Goods receipt deleted successfully' };
+  }
+
+  async update(
+    id: string,
+    dto: UpdateGoodsReceiptDto,
+    file: Express.Multer.File | undefined,
+    userId: string,
+  ) {
+    const grn = await this.findById(id);
+    const grnBatches = await this.repository.getBatchesByGrnId(id);
+
+    if (!grnBatches || grnBatches.length === 0) {
+      throw new BadRequestException('This GRN has no batches to edit');
+    }
+
+    if (dto.items && dto.items.length > 0) {
+      for (const itemDto of dto.items) {
+        const batch = grnBatches.find((b) => b.id === itemDto.batchId);
+        if (!batch) {
+          throw new BadRequestException(
+            `Batch ${itemDto.batchId} does not belong to GRN ${id}`,
+          );
+        }
+
+        if (itemDto.batchNo && itemDto.batchNo !== batch.batchNo) {
+          const duplicateBatch = await this.batchesRepository.findExistingBatchNos([itemDto.batchNo]);
+          if (duplicateBatch.length > 0) {
+            throw new ConflictException(
+              `Batch number "${itemDto.batchNo}" already exists`,
+            );
+          }
+        }
+
+        if (itemDto.expiryDate) {
+          const now = new Date();
+          if (new Date(itemDto.expiryDate) <= now) {
+            throw new BadRequestException(
+              `Batch ${batch.batchNo}: expiry date must be in the future`,
+            );
+          }
+        }
+
+        if (
+          itemDto.numberOfPacks !== undefined ||
+          itemDto.packSize !== undefined
+        ) {
+          const newNumberOfPacks = itemDto.numberOfPacks ?? (batch.quantityReceived / batch.packSize);
+          const newPackSize = itemDto.packSize ?? batch.packSize;
+          const newTotalUnits = newNumberOfPacks * newPackSize;
+
+          const soldQty = await this.repository.getSoldQuantityForBatch(batch.id);
+          const transferredQty = await this.repository.getTransferredQuantityForBatch(batch.id);
+          const consumedQty = soldQty + transferredQty;
+
+          if (newTotalUnits < consumedQty) {
+            throw new BadRequestException(
+              `Batch ${batch.batchNo}: cannot reduce quantity to ${newTotalUnits} — ${consumedQty} units have been sold/transferred (${soldQty} sold, ${transferredQty} transferred)`,
+            );
+          }
+        }
+
+        if (itemDto.unitCost !== undefined) {
+          const soldQty = await this.repository.getSoldQuantityForBatch(batch.id);
+          if (soldQty > 0) {
+            throw new BadRequestException(
+              `Batch ${batch.batchNo}: cannot change unit cost because ${soldQty} units have been sold`,
+            );
+          }
+        }
+
+        if (itemDto.sellingPrice !== undefined && itemDto.unitCost !== undefined) {
+          const newPackSize = itemDto.packSize ?? batch.packSize;
+          const costPerUnit = itemDto.unitCost / newPackSize;
+          if (itemDto.sellingPrice < costPerUnit) {
+            throw new BadRequestException(
+              `Batch ${batch.batchNo}: selling price (${itemDto.sellingPrice}) cannot be less than per-unit cost (${costPerUnit})`,
+            );
+          }
+        } else if (itemDto.sellingPrice !== undefined && itemDto.unitCost === undefined) {
+          const currentCostPerUnit = Number(batch.unitCost);
+          if (itemDto.sellingPrice < currentCostPerUnit) {
+            throw new BadRequestException(
+              `Batch ${batch.batchNo}: selling price (${itemDto.sellingPrice}) cannot be less than per-unit cost (${currentCostPerUnit})`,
+            );
+          }
+        }
+      }
+    }
+
+    let invoiceUrl = grn.invoiceDocumentUrl;
+    if (file) {
+      try {
+        if (invoiceUrl && !invoiceUrl.startsWith('http')) {
+          await this.minioService.deleteFile('invoices', invoiceUrl);
+        }
+        const ext = this.getFileExtension(file.originalname);
+        const invoiceKey = `invoices/${grn.supplierId}/${grn.grnNumber}.${ext}`;
+        invoiceUrl = await this.minioService.uploadFile(
+          'invoices',
+          invoiceKey,
+          file.buffer,
+          file.mimetype,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to upload invoice: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw new ServiceUnavailableException('Failed to upload invoice document');
+      }
+    }
+
+    await this.repository.updateGrn(id, {
+      receiptDate: dto.receiptDate,
+      taxPaid: dto.taxPaid,
+      paymentDueDateType: dto.paymentDueDateType,
+      paymentDueDate: dto.paymentDueDate,
+      paymentMethod: dto.paymentMethod,
+      invoiceDocumentUrl: invoiceUrl !== grn.invoiceDocumentUrl ? invoiceUrl ?? undefined : undefined,
+    });
+
+    if (dto.items && dto.items.length > 0) {
+      for (const itemDto of dto.items) {
+        const batch = grnBatches.find((b) => b.id === itemDto.batchId);
+        if (!batch) continue;
+
+        const oldNumberOfPacks = batch.quantityReceived / batch.packSize;
+        const newNumberOfPacks = itemDto.numberOfPacks ?? oldNumberOfPacks;
+        const newPackSize = itemDto.packSize ?? batch.packSize;
+        const oldTotalUnits = batch.quantityReceived;
+        const newTotalUnits = newNumberOfPacks * newPackSize;
+
+        let costPerUnit = Number(batch.unitCost);
+        if (itemDto.unitCost !== undefined) {
+          costPerUnit = itemDto.unitCost / newPackSize;
+        }
+
+        let newSellingPrice = Number(batch.sellingPrice);
+        if (itemDto.sellingPrice !== undefined) {
+          newSellingPrice = itemDto.sellingPrice;
+        } else if (itemDto.markupPercentage !== undefined) {
+          newSellingPrice = Math.round(costPerUnit * (1 + itemDto.markupPercentage / 100) * 100) / 100;
+        } else if (itemDto.unitCost !== undefined) {
+          const currentSellingPrice = Number(batch.sellingPrice);
+          const currentCostPerUnit = Number(batch.unitCost);
+          if (currentCostPerUnit > 0) {
+            const markupRatio = currentSellingPrice / currentCostPerUnit;
+            newSellingPrice = Math.round(costPerUnit * markupRatio * 100) / 100;
+          }
+        }
+
+        await this.batchesRepository.update(batch.id, {
+          batchNo: itemDto.batchNo,
+          expiryDate: itemDto.expiryDate,
+          packSize: itemDto.packSize,
+          unitCost: itemDto.unitCost !== undefined ? itemDto.unitCost / newPackSize : undefined,
+          sellingPrice: newSellingPrice,
+          quantityReceived: newTotalUnits,
+        });
+
+        if (newTotalUnits !== oldTotalUnits) {
+          const receiptMovement = await this.repository.getReceiptStockMovement(batch.id);
+          if (receiptMovement) {
+            const delta = newTotalUnits - oldTotalUnits;
+            await this.stockMovementsService.record({
+              batchId: batch.id,
+              locationId: receiptMovement.locationId,
+              type: 'adjustment',
+              quantity: delta,
+              refId: id,
+              refType: 'goods_receipt',
+              createdBy: userId,
+            });
+          }
+        }
+      }
+    }
+
+    const updatedBatches = await this.repository.getBatchesByGrnId(id);
+    const newTotalCost = updatedBatches.reduce(
+      (sum, b) => sum + b.quantityReceived * Number(b.unitCost),
+      0,
+    );
+    await this.repository.updateGrn(id, { totalCost: newTotalCost });
+
+    await this.auditLog.log({
+      userId,
+      action: 'UPDATE_GOODS_RECEIPT',
+      entityType: 'goods_receipt',
+      entityId: id,
+      afterData: { ...dto, totalCost: newTotalCost, items: dto.items?.length ?? 0 },
+    });
+
+    return this.findById(id);
   }
 
   private calculatePaymentDueDate(
