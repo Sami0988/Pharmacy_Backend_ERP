@@ -28,10 +28,10 @@ export class ReportsRepository {
     totalQuantity: number;
     totalValueAtCost: number;
     sellingPrice: number;
-    packSize: number;
-    storePacks: number;
-    dispatcherPacks: number;
-    totalPacks: number;
+    packSize: number | null;
+    storePacks: number | null;
+    dispatcherPacks: number | null;
+    totalPacks: number | null;
   }>> {
     const result = await this.databaseService.db
       .select({
@@ -49,6 +49,13 @@ export class ReportsRepository {
           group by b2.id, b2.pack_size
           order by sum(sm2.quantity) desc
           limit 1
+        ), 1)`,
+        distinctPackSizes: sql<number>`coalesce((
+          select count(distinct b2.pack_size) from batches b2
+          inner join stock_movements sm2 on sm2.batch_id = b2.id
+          inner join locations l2 on sm2.location_id = l2.id
+          where b2.item_id = ${items.id} and l2.name in ('Store', 'Dispatcher')
+            and coalesce(sum(sm2.quantity), 0) > 0
         ), 1)`,
         sellingPrice: sql<string>`coalesce((
           select b2.selling_price from batches b2
@@ -69,19 +76,26 @@ export class ReportsRepository {
       .groupBy(items.id, items.name)
       .having(sql`sum(${stockMovements.quantity}) > 0`);
 
-    return result.map((r) => ({
-      itemId: r.itemId,
-      itemName: r.itemName,
-      storeQuantity: Number(r.storeQuantity),
-      dispatcherQuantity: Number(r.dispatcherQuantity),
-      totalQuantity: Number(r.totalQuantity),
-      totalValueAtCost: Math.round(Number(r.totalQuantity) * Number(r.avgCost) * 100) / 100,
-      packSize: Number(r.packSize),
-      storePacks: Math.floor(Number(r.storeQuantity) / Number(r.packSize)),
-      dispatcherPacks: Math.floor(Number(r.dispatcherQuantity) / Number(r.packSize)),
-      totalPacks: Math.floor(Number(r.totalQuantity) / Number(r.packSize)),
-      sellingPrice: Number(r.sellingPrice),
-    }));
+    return result.map((r) => {
+      const storeQty = Number(r.storeQuantity);
+      const dispatcherQty = Number(r.dispatcherQuantity);
+      const totalQty = Number(r.totalQuantity);
+      const packSize = Number(r.packSize);
+      const samePackSize = Number(r.distinctPackSizes) === 1;
+      return {
+        itemId: r.itemId,
+        itemName: r.itemName,
+        storeQuantity: storeQty,
+        dispatcherQuantity: dispatcherQty,
+        totalQuantity: totalQty,
+        totalValueAtCost: Math.round(totalQty * Number(r.avgCost) * 100) / 100,
+        packSize: samePackSize ? packSize : null,
+        storePacks: samePackSize ? Math.floor(storeQty / packSize) : null,
+        dispatcherPacks: samePackSize ? Math.floor(dispatcherQty / packSize) : null,
+        totalPacks: samePackSize ? Math.floor(totalQty / packSize) : null,
+        sellingPrice: Number(r.sellingPrice),
+      };
+    });
   }
 
   async getStockReport(params: { page: number; limit: number }, search?: string): Promise<PaginatedResponse<any>> {
@@ -107,6 +121,13 @@ export class ReportsRepository {
           group by b2.id, b2.pack_size
           order by sum(sm2.quantity) desc
           limit 1
+        ), 1)`,
+        distinctPackSizes: sql<number>`coalesce((
+          select count(distinct b2.pack_size) from batches b2
+          inner join stock_movements sm2 on sm2.batch_id = b2.id
+          inner join locations l2 on sm2.location_id = l2.id
+          where b2.item_id = ${items.id} and l2.name in ('Store', 'Dispatcher')
+            and coalesce(sum(sm2.quantity), 0) > 0
         ), 1)`,
         sellingPrice: sql<string>`coalesce((
           select b2.selling_price from batches b2
@@ -150,6 +171,7 @@ export class ReportsRepository {
       totalQuantity: number;
       avgCost: number;
       packSize: number;
+      distinctPackSizes: number;
       sellingPrice: string;
     }>({
       db: this.databaseService.db,
@@ -161,19 +183,26 @@ export class ReportsRepository {
 
     return {
       ...result,
-      data: result.data.map((r) => ({
-        itemId: r.itemId,
-        itemName: r.itemName,
-        storeQuantity: Number(r.storeQuantity),
-        dispatcherQuantity: Number(r.dispatcherQuantity),
-        totalQuantity: Number(r.totalQuantity),
-        totalValueAtCost: Math.round(Number(r.totalQuantity) * Number(r.avgCost) * 100) / 100,
-        packSize: Number(r.packSize),
-        storePacks: Math.floor(Number(r.storeQuantity) / Number(r.packSize)),
-        dispatcherPacks: Math.floor(Number(r.dispatcherQuantity) / Number(r.packSize)),
-        totalPacks: Math.floor(Number(r.totalQuantity) / Number(r.packSize)),
-        sellingPrice: Number(r.sellingPrice),
-      })),
+      data: result.data.map((r) => {
+        const storeQty = Number(r.storeQuantity);
+        const dispatcherQty = Number(r.dispatcherQuantity);
+        const totalQty = Number(r.totalQuantity);
+        const packSize = Number(r.packSize);
+        const samePackSize = Number(r.distinctPackSizes) === 1;
+        return {
+          itemId: r.itemId,
+          itemName: r.itemName,
+          storeQuantity: storeQty,
+          dispatcherQuantity: dispatcherQty,
+          totalQuantity: totalQty,
+          totalValueAtCost: Math.round(totalQty * Number(r.avgCost) * 100) / 100,
+          packSize: samePackSize ? packSize : null,
+          storePacks: samePackSize ? Math.floor(storeQty / packSize) : null,
+          dispatcherPacks: samePackSize ? Math.floor(dispatcherQty / packSize) : null,
+          totalPacks: samePackSize ? Math.floor(totalQty / packSize) : null,
+          sellingPrice: Number(r.sellingPrice),
+        };
+      }),
     };
   }
 
