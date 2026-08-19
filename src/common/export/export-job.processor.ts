@@ -1,14 +1,12 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { Injectable, Logger } from '@nestjs/common';
 import { ExportJobData } from './export-job.service';
 import { PdfExportService } from './pdf-export.service';
 import { MinioService } from '../storage/minio.service';
 import { DatabaseService } from '../../db/database.service';
 import { ReportsRepository } from '../../modules/reports/reports.repository';
 
-@Processor('export-jobs')
-export class ExportJobProcessor extends WorkerHost {
+@Injectable()
+export class ExportJobProcessor {
   private readonly logger = new Logger(ExportJobProcessor.name);
 
   constructor(
@@ -16,52 +14,46 @@ export class ExportJobProcessor extends WorkerHost {
     private readonly minioService: MinioService,
     private readonly databaseService: DatabaseService,
     private readonly reportsRepository: ReportsRepository,
-  ) {
-    super();
-  }
+  ) {}
 
-  async process(job: Job<ExportJobData>): Promise<{ result: { fileUrl: string; fileName: string } }> {
-    const { jobId, type, format, params } = job.data;
+  async process(
+    type: ExportJobData['type'],
+    format: ExportJobData['format'],
+    params: Record<string, unknown>,
+  ): Promise<{ result: { fileUrl: string; fileName: string } }> {
+    const jobId = 'sync';
 
-    this.logger.log(`Processing export job: ${jobId} (${type}, ${format})`);
+    const result = await this.getReportData(type, params);
+    const fileName = `${type}-report-${jobId}`;
+    let fileUrl: string;
 
-    try {
-      const result = await this.getReportData(type, params);
-      const fileName = `${type}-report-${jobId}`;
-      let fileUrl: string;
-
-      if (format === 'pdf') {
-        const title = `${type} Report`;
-        const pdfBuffer = await this.pdfExportService.generatePdfFromData(
-          title,
-          result.columns,
-          result.rows,
-        );
-        await this.minioService.uploadFile(
-          'reports',
-          `${fileName}.pdf`,
-          pdfBuffer,
-          'application/pdf',
-        );
-        fileUrl = `${fileName}.pdf`;
-      } else {
-        // CSV
-        const csvContent = this.generateCsv(result.columns, result.rows);
-        await this.minioService.uploadFile(
-          'reports',
-          `${fileName}.csv`,
-          Buffer.from(csvContent),
-          'text/csv',
-        );
-        fileUrl = `${fileName}.csv`;
-      }
-
-      this.logger.log(`Export job completed: ${jobId}`);
-      return { result: { fileUrl, fileName: `${fileName}.${format}` } };
-    } catch (error) {
-      this.logger.error(`Export job failed: ${jobId}`, error);
-      throw error;
+    if (format === 'pdf') {
+      const title = `${type} Report`;
+      const pdfBuffer = await this.pdfExportService.generatePdfFromData(
+        title,
+        result.columns,
+        result.rows,
+      );
+      await this.minioService.uploadFile(
+        'reports',
+        `${fileName}.pdf`,
+        pdfBuffer,
+        'application/pdf',
+      );
+      fileUrl = `${fileName}.pdf`;
+    } else {
+      const csvContent = this.generateCsv(result.columns, result.rows);
+      await this.minioService.uploadFile(
+        'reports',
+        `${fileName}.csv`,
+        Buffer.from(csvContent),
+        'text/csv',
+      );
+      fileUrl = `${fileName}.csv`;
     }
+
+    this.logger.log(`Export completed: ${type} (${format})`);
+    return { result: { fileUrl, fileName: `${fileName}.${format}` } };
   }
 
   private async getReportData(type: ExportJobData['type'], params: Record<string, unknown>): Promise<{ columns: string[]; rows: string[][] }> {
@@ -143,7 +135,6 @@ export class ExportJobProcessor extends WorkerHost {
     const headers = columns.join(',');
     const csvRows = rows.map((row) =>
       row.map((value) => {
-        // Escape CSV values
         if (value.includes(',') || value.includes('"') || value.includes('\n')) {
           return `"${value.replace(/"/g, '""')}"`;
         }

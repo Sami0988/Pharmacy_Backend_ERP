@@ -24,7 +24,7 @@
     "db:seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
-    "@nestjs/bullmq": "^11.0.4",
+
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
@@ -35,10 +35,10 @@
     "@nestjs/swagger": "^11.4.6",
     "@nestjs/terminus": "^11.1.1",
     "@nestjs/throttler": "^6.5.0",
-    "@types/ioredis": "^5.0.0",
+
     "@types/multer": "^2.2.0",
     "bcrypt": "^6.0.0",
-    "bullmq": "^6.0.6",
+
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "cloudinary": "^2.10.0",

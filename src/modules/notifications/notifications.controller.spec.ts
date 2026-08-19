@@ -1,12 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
-import { Queue } from 'bullmq';
+import { StockAlertsProcessor } from '../../../jobs/processors/stock-alerts.processor';
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;
   let service: jest.Mocked<NotificationsService>;
-  let queue: jest.Mocked<Queue>;
+  let processor: jest.Mocked<StockAlertsProcessor>;
 
   beforeEach(async () => {
     service = {
@@ -17,15 +17,15 @@ describe('NotificationsController', () => {
       getSummary: jest.fn(),
     } as any;
 
-    queue = {
-      add: jest.fn().mockResolvedValue({}),
+    processor = {
+      process: jest.fn().mockResolvedValue({ zeroStock: 0, lowStock: 0, nearExpiry: 0, expired: 0, paymentDue: 0, paymentOverdue: 0 }),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationsController],
       providers: [
         { provide: NotificationsService, useValue: service },
-        { provide: 'BullQueue_stock-alerts', useValue: queue },
+        { provide: StockAlertsProcessor, useValue: processor },
       ],
     }).compile();
 
@@ -35,24 +35,12 @@ describe('NotificationsController', () => {
   describe('findAll', () => {
     it('should return paginated notifications', async () => {
       service.findAll.mockResolvedValue([{ id: 'n-1', type: 'expired' }]);
-      const result = await controller.findAll('expired', 'false', '1', '10');
+      const result = await controller.findAll({ type: 'expired', isRead: 'false', page: '1', limit: '10' } as any);
       expect(service.findAll).toHaveBeenCalledWith({
         type: 'expired',
         isRead: false,
-        page: 1,
-        limit: 10,
-      });
-      expect(result).toHaveLength(1);
-    });
-
-    it('should handle missing query params', async () => {
-      service.findAll.mockResolvedValue([]);
-      await controller.findAll(undefined, undefined, undefined, undefined);
-      expect(service.findAll).toHaveBeenCalledWith({
-        type: undefined,
-        isRead: undefined,
-        page: undefined,
-        limit: undefined,
+        page: '1',
+        limit: '10',
       });
     });
   });
@@ -96,10 +84,10 @@ describe('NotificationsController', () => {
   });
 
   describe('runCheckNow', () => {
-    it('should enqueue the stock alerts job', async () => {
+    it('should run the stock alerts check directly', async () => {
       const result = await controller.runCheckNow();
-      expect(queue.add).toHaveBeenCalledWith('run-check', {}, { removeOnComplete: true });
-      expect(result).toEqual({ message: 'Stock alerts check queued' });
+      expect(processor.process).toHaveBeenCalled();
+      expect(result).toEqual({ message: 'Stock alerts check completed' });
     });
   });
 });

@@ -1,25 +1,21 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../db/database.service';
 import { NotificationsService } from '../../modules/notifications/notifications.service';
 import { StockMovementsService } from '../../modules/stock-movements/stock-movements.service';
 import { items, batches, stockMovements, locations, goodsReceipts, suppliers, supplierPayments } from '../../db';
 import { eq, and, sql, lt, gte } from 'drizzle-orm';
 
-@Processor('stock-alerts', { concurrency: 1 })
-export class StockAlertsProcessor extends WorkerHost {
+@Injectable()
+export class StockAlertsProcessor {
   private readonly logger = new Logger(StockAlertsProcessor.name);
 
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly notificationsService: NotificationsService,
     private readonly stockMovementsService: StockMovementsService,
-  ) {
-    super();
-  }
+  ) {}
 
-  async process(job: Job) {
+  async process() {
     this.logger.log('Starting stock alerts check...');
 
     const results = {

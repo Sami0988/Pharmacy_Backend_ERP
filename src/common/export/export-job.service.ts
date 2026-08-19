@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
+import { ExportJobProcessor } from './export-job.processor';
 
 export interface ExportJobData {
   jobId: string;
@@ -13,7 +12,7 @@ export interface ExportJobData {
 
 export interface ExportJobStatus {
   jobId: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
+  status: 'completed' | 'failed';
   result?: {
     fileUrl: string;
     fileName: string;
@@ -23,12 +22,14 @@ export interface ExportJobStatus {
   completedAt?: Date;
 }
 
+const jobResults = new Map<string, ExportJobStatus>();
+
 @Injectable()
 export class ExportJobService {
   private readonly logger = new Logger(ExportJobService.name);
 
   constructor(
-    @InjectQueue('export-jobs') private exportQueue: Queue,
+    private readonly exportJobProcessor: ExportJobProcessor,
   ) {}
 
   async createExportJob(
@@ -36,73 +37,35 @@ export class ExportJobService {
     format: ExportJobData['format'],
     params: Record<string, unknown>,
     userId: string,
-  ): Promise<{ jobId: string }> {
+  ): Promise<{ jobId: string; status: string }> {
     const jobId = randomUUID();
 
-    const jobData: ExportJobData = {
+    const status: ExportJobStatus = {
       jobId,
-      type,
-      format,
-      params,
-      userId,
+      status: 'completed',
+      createdAt: new Date(),
     };
 
-    await this.exportQueue.add('export', jobData, {
-      jobId,
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 2000,
-      },
-      removeOnComplete: {
-        age: 86400, // Keep completed jobs for 24 hours
-      },
-      removeOnFail: {
-        age: 86400,
-      },
-    });
+    jobResults.set(jobId, status);
 
-    this.logger.log(`Export job created: ${jobId} (${type}, ${format})`);
+    try {
+      this.logger.log(`Processing export job: ${jobId} (${type}, ${format})`);
+      const result = await this.exportJobProcessor.process(type, format, params);
+      status.status = 'completed';
+      status.result = result.result;
+      status.completedAt = new Date();
+      this.logger.log(`Export job completed: ${jobId}`);
+    } catch (error) {
+      status.status = 'failed';
+      status.error = error instanceof Error ? error.message : String(error);
+      status.completedAt = new Date();
+      this.logger.error(`Export job failed: ${jobId}`, error);
+    }
 
-    return { jobId };
+    return { jobId, status: status.status };
   }
 
   async getJobStatus(jobId: string): Promise<ExportJobStatus | null> {
-    const job = await this.exportQueue.getJob(jobId);
-
-    if (!job) {
-      return null;
-    }
-
-    const state = await job.getState();
-    const data = job.data as ExportJobData;
-
-    let status: ExportJobStatus['status'];
-    switch (state) {
-      case 'waiting':
-      case 'delayed':
-        status = 'queued';
-        break;
-      case 'active':
-        status = 'processing';
-        break;
-      case 'completed':
-        status = 'completed';
-        break;
-      case 'failed':
-        status = 'failed';
-        break;
-      default:
-        status = 'queued';
-    }
-
-    return {
-      jobId,
-      status,
-      result: job.returnvalue?.result,
-      error: job.failedReason,
-      createdAt: new Date(job.timestamp),
-      completedAt: job.finishedOn ? new Date(job.finishedOn) : undefined,
-    };
+    return jobResults.get(jobId) ?? null;
   }
 }

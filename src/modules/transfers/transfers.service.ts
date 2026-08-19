@@ -125,16 +125,16 @@ export class TransfersService {
     let numberOfPacks: number;
 
     if (hasPacks) {
-      if (!Number.isInteger(dto.numberOfPacks) || dto.numberOfPacks <= 0) {
+      if (!Number.isInteger(dto.numberOfPacks) || dto.numberOfPacks! <= 0) {
         throw new BadRequestException('Number of packs must be a positive integer');
       }
-      numberOfPacks = dto.numberOfPacks;
+      numberOfPacks = dto.numberOfPacks!;
       transferQuantity = numberOfPacks * packSize;
     } else {
-      if (!Number.isInteger(dto.quantity) || dto.quantity <= 0) {
+      if (!Number.isInteger(dto.quantity) || dto.quantity! <= 0) {
         throw new BadRequestException('Quantity must be a positive integer');
       }
-      transferQuantity = dto.quantity;
+      transferQuantity = dto.quantity!;
       numberOfPacks = Math.floor(transferQuantity / packSize);
     }
 

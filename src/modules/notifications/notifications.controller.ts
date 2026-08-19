@@ -6,13 +6,15 @@ import {
   Query,
   Body,
   Post,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { NotificationsService } from './notifications.service';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { StockAlertsProcessor } from '../../jobs/processors/stock-alerts.processor';
 import { PaginationQueryDto } from '../../common/pagination';
 
 class NotificationsQueryDto extends PaginationQueryDto {
@@ -29,10 +31,27 @@ class NotificationsQueryDto extends PaginationQueryDto {
 @ApiBearerAuth('jwt-access')
 @Controller('notifications')
 export class NotificationsController {
+  private readonly cronSecret = process.env.STOCK_ALERTS_CRON_SECRET;
+
   constructor(
     private readonly notificationsService: NotificationsService,
-    @InjectQueue('stock-alerts') private readonly stockAlertsQueue: Queue,
+    private readonly stockAlertsProcessor: StockAlertsProcessor,
   ) {}
+
+  @Public()
+  @Get('cron')
+  async triggerCronCheck(@Query('secret') secret: string, @Res() res: Response) {
+    if (!this.cronSecret || secret !== this.cronSecret) {
+      res.status(403).json({ status: 'error', message: 'Invalid secret' });
+      return;
+    }
+
+    res.status(202).json({ status: 'accepted', message: 'Stock alerts check started' });
+
+    this.stockAlertsProcessor.process().catch((err) => {
+      console.error('Background stock alerts check failed:', err);
+    });
+  }
 
   @Get()
   @Roles('admin', 'store_keeper')
@@ -83,7 +102,7 @@ export class NotificationsController {
   @Roles('admin')
   @ApiOperation({ summary: 'Manually trigger stock alerts check' })
   async runCheckNow() {
-    await this.stockAlertsQueue.add('run-check', {}, { removeOnComplete: true });
-    return { message: 'Stock alerts check queued' };
+    await this.stockAlertsProcessor.process();
+    return { message: 'Stock alerts check completed' };
   }
 }

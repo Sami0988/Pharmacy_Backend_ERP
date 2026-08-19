@@ -1,40 +1,16 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StockAlertsProcessor } from './processors/stock-alerts.processor';
-import { StockAlertsBootstrap } from './stock-alerts.bootstrap';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { StockMovementsModule } from '../modules/stock-movements/stock-movements.module';
 import { DatabaseModule } from '../db/database.module';
 
 @Module({
   imports: [
-    BullModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        connection: {
-          host: configService.get<string>('REDIS_HOST', 'localhost'),
-          port: configService.get<number>('REDIS_PORT', 6379),
-          password: configService.get<string>('REDIS_PASSWORD'),
-          tls: configService.get<string>('REDIS_HOST', 'localhost').includes('upstash.io')
-            ? {}
-            : undefined,
-          enableOfflineQueue: true,
-          maxRetriesPerRequest: null,
-        },
-        defaultJobOptions: {
-          removeOnComplete: true,
-          removeOnFail: false,
-        },
-      }),
-    }),
-    BullModule.registerQueue({ name: 'stock-alerts' }),
     NotificationsModule,
     StockMovementsModule,
     DatabaseModule,
   ],
-  providers: [StockAlertsProcessor, StockAlertsBootstrap],
-  exports: [BullModule],
+  providers: [StockAlertsProcessor],
+  exports: [StockAlertsProcessor],
 })
 export class JobsModule {}

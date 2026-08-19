@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
 import { ExportJobController } from './export-job.controller';
 import { ExportJobService } from './export-job.service';
 import { ExportJobProcessor } from './export-job.processor';
@@ -11,7 +10,6 @@ import { PdfModule } from '../pdf/pdf.module';
 
 @Module({
   imports: [
-    BullModule.registerQueue({ name: 'export-jobs' }),
     StorageModule,
     DatabaseModule,
     PdfModule,
