@@ -55,7 +55,6 @@ export class ReportsRepository {
           inner join stock_movements sm2 on sm2.batch_id = b2.id
           inner join locations l2 on sm2.location_id = l2.id
           where b2.item_id = ${items.id} and l2.name in ('Store', 'Dispatcher')
-            and coalesce(sum(sm2.quantity), 0) > 0
         ), 1)`,
         sellingPrice: sql<string>`coalesce((
           select b2.selling_price from batches b2
@@ -127,7 +126,6 @@ export class ReportsRepository {
           inner join stock_movements sm2 on sm2.batch_id = b2.id
           inner join locations l2 on sm2.location_id = l2.id
           where b2.item_id = ${items.id} and l2.name in ('Store', 'Dispatcher')
-            and coalesce(sum(sm2.quantity), 0) > 0
         ), 1)`,
         sellingPrice: sql<string>`coalesce((
           select b2.selling_price from batches b2
