@@ -3,7 +3,8 @@ services:
     name: pharmacy-erp-api
     runtime: node
     plan: free
-    buildCommand: pnpm install && pnpm build && pnpm db:push
+    buildCommand: pnpm install && pnpm build
+    postDeployCommand: pnpm db:push
     startCommand: pnpm start:prod
     envVars:
       - key: NODE_ENV
