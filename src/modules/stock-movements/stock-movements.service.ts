@@ -33,6 +33,7 @@ export class StockMovementsService {
     locationId: string;
     newQuantity: number;
     reason: string;
+    adjustmentUnit?: string;
     createdBy: string;
   }) {
     return this.repository.adjustStock(params);

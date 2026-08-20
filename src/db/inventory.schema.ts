@@ -58,6 +58,7 @@ export const stockMovements = pgTable(
     refId: uuid('ref_id'),
     refType: text('ref_type'),
     reason: text('reason'),
+    adjustmentUnit: text('adjustment_unit'),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id),

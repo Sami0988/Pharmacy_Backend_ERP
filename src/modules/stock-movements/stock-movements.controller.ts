@@ -43,6 +43,7 @@ export class StockMovementsController {
       locationId: dto.locationId,
       newQuantity: dto.newQuantity,
       reason: dto.reason,
+      adjustmentUnit: dto.adjustmentUnit,
       createdBy: userId,
     });
   }

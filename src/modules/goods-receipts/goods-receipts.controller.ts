@@ -291,6 +291,23 @@ export class GoodsReceiptsController {
     return { url };
   }
 
+  @Delete(':grnId/items/:batchId')
+  @Roles('admin', 'store_keeper')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove a specific item (batch) from a goods receipt' })
+  @ApiParam({ name: 'grnId', description: 'GRN UUID' })
+  @ApiParam({ name: 'batchId', description: 'Batch UUID to remove' })
+  @ApiResponse({ status: 200, description: 'Item removed successfully' })
+  @ApiResponse({ status: 400, description: 'Batch does not belong to this GRN' })
+  @ApiResponse({ status: 404, description: 'GRN not found' })
+  async removeItem(
+    @Param('grnId') grnId: string,
+    @Param('batchId') batchId: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.service.removeItem(grnId, batchId, userId);
+  }
+
   @Delete(':id')
   @Roles('admin')
   @HttpCode(HttpStatus.OK)

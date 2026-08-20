@@ -81,6 +81,7 @@ export class StockMovementsRepository {
     locationId: string;
     newQuantity: number;
     reason: string;
+    adjustmentUnit?: string;
     createdBy: string;
   }) {
     const currentQty = await this.getCurrentQuantity(
@@ -103,6 +104,7 @@ export class StockMovementsRepository {
         quantity: delta,
         refType: 'adjustment',
         reason: params.reason,
+        adjustmentUnit: params.adjustmentUnit,
         createdBy: params.createdBy,
       })
       .returning();

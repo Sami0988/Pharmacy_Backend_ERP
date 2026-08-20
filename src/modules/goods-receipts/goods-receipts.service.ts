@@ -310,6 +310,30 @@ export class GoodsReceiptsService {
     return { message: 'Goods receipt deleted successfully' };
   }
 
+  async removeItem(grnId: string, batchId: string, userId: string) {
+    await this.findById(grnId);
+
+    const result = await this.repository.removeItemFromGrn(grnId, batchId);
+
+    if (result.error === 'GRN_NOT_FOUND') {
+      throw new NotFoundException(`Goods receipt ${grnId} not found`);
+    }
+    if (result.error === 'BATCH_NOT_FOUND') {
+      throw new BadRequestException(`Batch ${batchId} does not belong to goods receipt ${grnId}`);
+    }
+
+    await this.auditLog.log({
+      userId,
+      action: 'REMOVE_ITEM_FROM_GOODS_RECEIPT',
+      entityType: 'goods_receipt',
+      entityId: grnId,
+      beforeData: { batchId, previousTotalCost: result.previousTotalCost },
+      afterData: { newTotalCost: result.newTotalCost },
+    });
+
+    return result;
+  }
+
   async update(
     id: string,
     dto: UpdateGoodsReceiptDto,

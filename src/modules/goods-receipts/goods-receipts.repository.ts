@@ -353,6 +353,93 @@ export class GoodsReceiptsRepository {
     return Number(result[0]?.total ?? 0);
   }
 
+  async removeItemFromGrn(grnId: string, batchId: string) {
+    const grn = await this.databaseService.db
+      .select()
+      .from(goodsReceipts)
+      .where(eq(goodsReceipts.id, grnId))
+      .limit(1);
+
+    if (!grn[0]) return { error: 'GRN_NOT_FOUND' as const };
+
+    const batch = await this.databaseService.db
+      .select()
+      .from(batches)
+      .where(and(eq(batches.id, batchId), eq(batches.grnId, grnId)))
+      .limit(1);
+
+    if (!batch[0]) return { error: 'BATCH_NOT_FOUND' as const };
+
+    const warnings: string[] = [];
+
+    const saleCount = await this.databaseService.db
+      .select({ count: count() })
+      .from(saleItems)
+      .where(eq(saleItems.batchId, batchId));
+
+    if (saleCount[0].count > 0) {
+      warnings.push(`This batch has ${saleCount[0].count} sale(s) — stock may be affected`);
+    }
+
+    const transferCount = await this.databaseService.db
+      .select({ count: count() })
+      .from(transfers)
+      .where(eq(transfers.batchId, batchId));
+
+    if (transferCount[0].count > 0) {
+      warnings.push(`This batch has ${transferCount[0].count} transfer(s) — stock may be affected`);
+    }
+
+    const otherMovements = await this.databaseService.db
+      .select({ count: count() })
+      .from(stockMovements)
+      .where(
+        and(
+          eq(stockMovements.batchId, batchId),
+          sql`${stockMovements.type} != 'receipt'`,
+        ),
+      );
+
+    if (otherMovements[0].count > 0) {
+      warnings.push(`This batch has ${otherMovements[0].count} non-receipt stock movement(s) — stock may be affected`);
+    }
+
+    const previousTotalCost = Number(grn[0].totalCost);
+    const batchCost = batch[0].quantityReceived * Number(batch[0].unitCost);
+
+    const deletedMovement = await this.databaseService.db.transaction(async (tx) => {
+      const [deleted] = await tx
+        .delete(stockMovements)
+        .where(
+          and(
+            eq(stockMovements.batchId, batchId),
+            eq(stockMovements.type, 'receipt'),
+          ),
+        )
+        .returning();
+
+      await tx
+        .delete(batches)
+        .where(eq(batches.id, batchId));
+
+      const newTotalCost = previousTotalCost - batchCost;
+      await tx
+        .update(goodsReceipts)
+        .set({ totalCost: String(newTotalCost) })
+        .where(eq(goodsReceipts.id, grnId));
+
+      return deleted;
+    });
+
+    return {
+      movement: deletedMovement ?? null,
+      batch: batch[0],
+      previousTotalCost,
+      newTotalCost: previousTotalCost - batchCost,
+      warnings,
+    };
+  }
+
   async getReceiptStockMovement(batchId: string) {
     const result = await this.databaseService.db
       .select()

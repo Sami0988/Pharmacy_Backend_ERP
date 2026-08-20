@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsUUID, IsInt, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsUUID, IsInt, IsString, MinLength, IsOptional } from 'class-validator';
 
 export class AdjustStockDto {
   @ApiProperty({ description: 'Batch UUID' })
@@ -24,4 +24,12 @@ export class AdjustStockDto {
   @IsString()
   @MinLength(3)
   reason: string;
+
+  @ApiPropertyOptional({
+    example: 'tablets',
+    description: 'Unit of measurement for the adjustment (e.g., tablets, bottles, boxes)',
+  })
+  @IsString()
+  @IsOptional()
+  adjustmentUnit?: string;
 }
