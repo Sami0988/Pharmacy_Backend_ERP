@@ -233,20 +233,48 @@ export class GoodsReceiptsRepository {
         );
       }
 
-      const transferredItems = await this.databaseService.db
-        .select({ id: transfers.id })
-        .from(transfers)
-        .where(sql`${transfers.batchId} IN ${batchIds}`)
-        .limit(1);
-
-      if (transferredItems.length > 0) {
-        throw new BadRequestException(
-          'Cannot delete GRN: some batches have been transferred. Reverse the transfers first.',
-        );
-      }
     }
 
     return this.databaseService.db.transaction(async (tx) => {
+      // Reverse transfers: create reverse stock movements and delete transfer records
+      for (const batch of grnBatches) {
+        const batchTransfers = await tx
+          .select()
+          .from(transfers)
+          .where(eq(transfers.batchId, batch.id));
+
+        for (const transfer of batchTransfers) {
+          // Add stock back to the source location (reverse transfer_out)
+          await tx.insert(stockMovements).values({
+            batchId: transfer.batchId,
+            locationId: transfer.fromLocationId,
+            type: 'transfer_in',
+            quantity: transfer.quantity,
+            refId: transfer.id,
+            refType: 'transfer',
+            createdBy: transfer.transferredBy,
+          });
+
+          // Remove stock from the destination location (reverse transfer_in)
+          await tx.insert(stockMovements).values({
+            batchId: transfer.batchId,
+            locationId: transfer.toLocationId,
+            type: 'transfer_out',
+            quantity: -transfer.quantity,
+            refId: transfer.id,
+            refType: 'transfer',
+            createdBy: transfer.transferredBy,
+          });
+        }
+
+        // Delete the transfer records
+        if (batchTransfers.length > 0) {
+          await tx
+            .delete(transfers)
+            .where(eq(transfers.batchId, batch.id));
+        }
+      }
+
       await tx
         .delete(supplierPayments)
         .where(eq(supplierPayments.grnId, id));
