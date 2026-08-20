@@ -370,15 +370,15 @@ export class GoodsReceiptsRepository {
 
     if (!batch[0]) return { error: 'BATCH_NOT_FOUND' as const };
 
-    const warnings: string[] = [];
-
     const saleCount = await this.databaseService.db
       .select({ count: count() })
       .from(saleItems)
       .where(eq(saleItems.batchId, batchId));
 
     if (saleCount[0].count > 0) {
-      warnings.push(`This batch has ${saleCount[0].count} sale(s) — stock may be affected`);
+      throw new BadRequestException(
+        `Cannot remove item: this batch has ${saleCount[0].count} sale(s). Reverse the sales first.`,
+      );
     }
 
     const transferCount = await this.databaseService.db
@@ -387,21 +387,9 @@ export class GoodsReceiptsRepository {
       .where(eq(transfers.batchId, batchId));
 
     if (transferCount[0].count > 0) {
-      warnings.push(`This batch has ${transferCount[0].count} transfer(s) — stock may be affected`);
-    }
-
-    const otherMovements = await this.databaseService.db
-      .select({ count: count() })
-      .from(stockMovements)
-      .where(
-        and(
-          eq(stockMovements.batchId, batchId),
-          sql`${stockMovements.type} != 'receipt'`,
-        ),
+      throw new BadRequestException(
+        `Cannot remove item: this batch has ${transferCount[0].count} transfer(s). Reverse the transfers first.`,
       );
-
-    if (otherMovements[0].count > 0) {
-      warnings.push(`This batch has ${otherMovements[0].count} non-receipt stock movement(s) — stock may be affected`);
     }
 
     const previousTotalCost = Number(grn[0].totalCost);
@@ -436,7 +424,6 @@ export class GoodsReceiptsRepository {
       batch: batch[0],
       previousTotalCost,
       newTotalCost: previousTotalCost - batchCost,
-      warnings,
     };
   }
 
