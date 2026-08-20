@@ -9,6 +9,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=512
       - key: DATABASE_URL
         sync: false
       - key: REDIS_HOST
