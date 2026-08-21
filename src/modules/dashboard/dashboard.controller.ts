@@ -35,9 +35,16 @@ export class DashboardController {
  
   @Get('category-breakdown')
   @ApiOperation({ summary: 'Get inventory category breakdown' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
   @ApiResponse({ status: 200, description: 'Inventory distribution by category' })
-  getCategoryBreakdown() {
-    return this.dashboardService.getCategoryBreakdown();
+  getCategoryBreakdown(@Query('page') page?: string, @Query('limit') limit?: string) {
+    const p = page ? parseInt(page, 10) : 1;
+    const l = limit ? parseInt(limit, 10) : 10;
+    return this.dashboardService.getCategoryBreakdown(
+      Number.isFinite(p) && p > 0 ? p : 1,
+      Number.isFinite(l) && l > 0 ? l : 10,
+    );
   }
  
   @Get('revenue-trend')

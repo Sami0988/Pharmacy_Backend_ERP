@@ -77,7 +77,7 @@ export class DashboardRepository {
     };
   }
  
-  async getCategoryBreakdown() {
+  async getCategoryBreakdown(page: number = 1, limit: number = 10) {
     const rows = await this.databaseService.db
       .select({
         category: items.category,
@@ -88,13 +88,28 @@ export class DashboardRepository {
       .leftJoin(stockMovements, eq(stockMovements.batchId, batches.id))
       .groupBy(items.category)
       .orderBy(sql`coalesce(sum(${stockMovements.quantity}), 0) desc`);
- 
-    return rows
+  
+    const all = rows
       .map((row) => ({
         category: row.category || 'Uncategorized',
         count: Number(row.quantity),
       }))
       .filter((row) => row.count > 0);
+
+    const total = all.length;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+    const data = all.slice(offset, offset + limit);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
+    };
   }
  
   async getRevenueTrend(months: number = 6) {

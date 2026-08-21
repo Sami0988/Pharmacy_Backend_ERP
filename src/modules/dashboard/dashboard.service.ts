@@ -42,8 +42,8 @@ export class DashboardService {
     return this.repository.getInventoryCounts();
   }
  
-  async getCategoryBreakdown() {
-    return this.repository.getCategoryBreakdown();
+  async getCategoryBreakdown(page: number = 1, limit: number = 10) {
+    return this.repository.getCategoryBreakdown(page, limit);
   }
  
   async getRevenueTrend(months: number = 6) {
