@@ -264,6 +264,78 @@ export class GoodsReceiptsService {
     return this.repository.findAll(params);
   }
 
+  async addItem(grnId: string, item: CreateGoodsReceiptDto['items'][0], userId: string) {
+    const grn = await this.findById(grnId);
+
+    if (new Date(item.expiryDate) <= new Date()) {
+      throw new BadRequestException(`Batch ${item.batchNo}: expiry date must be in the future`);
+    }
+    if (!item.numberOfPacks || item.numberOfPacks <= 0) {
+      throw new BadRequestException(`Batch ${item.batchNo}: numberOfPacks must be positive`);
+    }
+    if (!item.packSize || item.packSize <= 0) {
+      throw new BadRequestException(`Batch ${item.batchNo}: packSize must be positive`);
+    }
+    if (item.unitCost <= 0) {
+      throw new BadRequestException(`Batch ${item.batchNo}: unit cost must be positive`);
+    }
+    if (item.sellingPrice === undefined && item.markupPercentage === undefined) {
+      throw new BadRequestException(`Batch ${item.batchNo}: either sellingPrice or markupPercentage is required`);
+    }
+    if (item.sellingPrice !== undefined && item.markupPercentage !== undefined) {
+      throw new BadRequestException(`Batch ${item.batchNo}: provide either sellingPrice or markupPercentage, not both`);
+    }
+
+    const costPerUnit = item.unitCost / item.packSize;
+    if (item.sellingPrice !== undefined && item.sellingPrice < costPerUnit) {
+      throw new BadRequestException(
+        `Batch ${item.batchNo}: selling price (${item.sellingPrice}) cannot be less than per-unit cost (${costPerUnit})`,
+      );
+    }
+
+    const existingBatchNos = await this.batchesRepository.findExistingBatchNos([item.batchNo]);
+    if (existingBatchNos.length > 0) {
+      throw new ConflictException(`Batch number "${item.batchNo}" already exists`);
+    }
+
+    const totalUnits = item.numberOfPacks * item.packSize;
+    const sellingPrice =
+      item.sellingPrice !== undefined
+        ? item.sellingPrice
+        : Math.round(costPerUnit * (1 + item.markupPercentage! / 100) * 100) / 100;
+
+    const batch = await this.repository.addItem(grnId, {
+      itemId: item.itemId,
+      batchNo: item.batchNo,
+      expiryDate: item.expiryDate,
+      packSize: item.packSize,
+      unitCost: String(costPerUnit),
+      sellingPrice: String(sellingPrice),
+      packPrice: item.packPrice != null ? String(item.packPrice) : null,
+      quantityReceived: totalUnits,
+      createdBy: userId,
+    });
+
+    try {
+      const qrBuffer = await QRCode.toBuffer(batch.id);
+      const qrKey = `batch-qr-codes/${batch.id}.png`;
+      await this.minioService.uploadFile('batch-qr-codes', qrKey, qrBuffer, 'image/png');
+      await this.batchesRepository.updateQrCodeUrl(batch.id, qrKey);
+    } catch (error) {
+      this.logger.warn(`Failed to generate QR code for batch ${batch.id}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    await this.auditLog.log({
+      userId,
+      action: 'ADD_ITEM_TO_GOODS_RECEIPT',
+      entityType: 'goods_receipt',
+      entityId: grnId,
+      afterData: { batchId: batch.id, batchNo: item.batchNo, quantityReceived: totalUnits },
+    });
+
+    return batch;
+  }
+
   async findById(id: string) {
     const grn = await this.repository.findById(id);
     if (!grn) {

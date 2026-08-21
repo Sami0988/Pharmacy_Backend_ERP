@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -6,9 +6,13 @@ import {
   ApiBearerAuth,
   ApiQuery,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 import { BatchesService } from './batches.service';
+import { UpdateBatchPackDto } from './dto/update-batch-pack.dto';
 import { PaginationQueryDto } from '../../common/pagination';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { Type } from 'class-transformer';
 import { IsOptional, IsInt, IsString, Min } from 'class-validator';
 
@@ -74,5 +78,23 @@ export class BatchesController {
   async getQrCode(@Param('id') id: string) {
     const url = await this.service.getQrCodeUrl(id);
     return { url };
+  }
+
+  @Patch(':id')
+  @Roles('admin', 'store_keeper')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update batch pack info (pack size, quantity, pricing)' })
+  @ApiParam({ name: 'id', description: 'Batch UUID' })
+  @ApiBody({ type: UpdateBatchPackDto })
+  @ApiResponse({ status: 200, description: 'Batch updated successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error or insufficient stock' })
+  @ApiResponse({ status: 404, description: 'Batch not found' })
+  updateBatchPack(
+    @Param('id') id: string,
+    @Body() dto: UpdateBatchPackDto,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.service.updateBatchPack(id, dto, userId);
   }
 }

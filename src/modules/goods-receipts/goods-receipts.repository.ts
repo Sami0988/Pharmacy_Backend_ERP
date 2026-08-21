@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../../db/database.service';
-import { goodsReceipts, suppliers, branches, batches, items, supplierPayments, stockMovements, saleItems, transfers } from '../../db';
+import { goodsReceipts, suppliers, branches, batches, items, supplierPayments, stockMovements, saleItems, transfers, locations } from '../../db';
 import { eq, and, or, sql, SQL, count, desc, asc } from 'drizzle-orm';
 import { paginate, PaginatedResponse } from '../../common/pagination';
 
@@ -425,6 +425,78 @@ export class GoodsReceiptsRepository {
       previousTotalCost,
       newTotalCost: previousTotalCost - batchCost,
     };
+  }
+
+  async addItem(grnId: string, data: {
+    itemId: string;
+    batchNo: string;
+    expiryDate: string;
+    packSize: number;
+    unitCost: string;
+    sellingPrice: string;
+    packPrice?: string | null;
+    quantityReceived: number;
+    createdBy: string;
+  }) {
+    return this.databaseService.db.transaction(async (tx) => {
+      const [grn] = await tx
+        .select()
+        .from(goodsReceipts)
+        .where(eq(goodsReceipts.id, grnId))
+        .limit(1);
+
+      if (!grn) throw new Error('GRN not found');
+
+      const [batch] = await tx
+        .insert(batches)
+        .values({
+          itemId: data.itemId,
+          grnId,
+          batchNo: data.batchNo,
+          expiryDate: data.expiryDate,
+          packSize: data.packSize,
+          unitCost: data.unitCost,
+          sellingPrice: data.sellingPrice,
+          packPrice: data.packPrice ?? null,
+          quantityReceived: data.quantityReceived,
+        })
+        .returning();
+
+      const [existingMovement] = await tx
+        .select({ locationId: stockMovements.locationId })
+        .from(stockMovements)
+        .innerJoin(batches, eq(stockMovements.batchId, batches.id))
+        .where(eq(batches.grnId, grnId))
+        .limit(1);
+
+      if (existingMovement) {
+        await tx.insert(stockMovements).values({
+          batchId: batch.id,
+          locationId: existingMovement.locationId,
+          type: 'receipt',
+          quantity: data.quantityReceived,
+          refId: grnId,
+          refType: 'goods_receipt',
+          createdBy: data.createdBy,
+        });
+      }
+
+      const grnBatches = await tx
+        .select()
+        .from(batches)
+        .where(eq(batches.grnId, grnId));
+
+      const newTotalCost = grnBatches.reduce(
+        (sum, b) => sum + b.quantityReceived * Number(b.unitCost),
+        0,
+      );
+      await tx
+        .update(goodsReceipts)
+        .set({ totalCost: String(newTotalCost) })
+        .where(eq(goodsReceipts.id, grnId));
+
+      return batch;
+    });
   }
 
   async getReceiptStockMovement(batchId: string) {

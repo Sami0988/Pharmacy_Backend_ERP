@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../../db/database.service';
-import { stockMovements, batches } from '../../db';
+import { stockMovements, batches, locations } from '../../db';
 import { eq, and, sql } from 'drizzle-orm';
 
 @Injectable()
@@ -66,13 +66,15 @@ export class StockMovementsRepository {
     const result = await this.databaseService.db
       .select({
         locationId: stockMovements.locationId,
+        locationName: locations.name,
         quantity: sql<number>`coalesce(sum(${stockMovements.quantity}), 0)`,
         packSize: batches.packSize,
       })
       .from(stockMovements)
       .innerJoin(batches, eq(stockMovements.batchId, batches.id))
+      .innerJoin(locations, eq(stockMovements.locationId, locations.id))
       .where(eq(stockMovements.batchId, batchId))
-      .groupBy(stockMovements.locationId, batches.packSize);
+      .groupBy(stockMovements.locationId, locations.name, batches.packSize);
     return result;
   }
 
@@ -81,7 +83,6 @@ export class StockMovementsRepository {
     locationId: string;
     newQuantity: number;
     reason: string;
-    adjustmentUnit?: string;
     createdBy: string;
   }) {
     const currentQty = await this.getCurrentQuantity(
@@ -104,7 +105,6 @@ export class StockMovementsRepository {
         quantity: delta,
         refType: 'adjustment',
         reason: params.reason,
-        adjustmentUnit: params.adjustmentUnit,
         createdBy: params.createdBy,
       })
       .returning();

@@ -66,6 +66,8 @@ export class SalesService {
       batchId: string;
       quantity: number;
       unitPrice: number;
+      saleUnit: string;
+      packSize: number;
     }> = [];
 
     for (let i = 0; i < dto.items.length; i++) {
@@ -148,7 +150,7 @@ export class SalesService {
       }
 
       const packSize = batch.packSize ?? 1;
-      const unitsToDeduct = saleUnit === 'pack' ? line.quantity * packSize : line.quantity;
+      const unitsToCheck = saleUnit === 'pack' ? line.quantity * packSize : line.quantity;
 
       const currentQuantity =
         await this.stockMovementsService.getCurrentQuantity(
@@ -156,11 +158,11 @@ export class SalesService {
           dispatcherLocationId,
         );
 
-      if (currentQuantity < unitsToDeduct) {
+      if (currentQuantity < unitsToCheck) {
         lineErrors.push({
           itemIndex: i,
           itemId: line.itemId,
-          message: `Insufficient stock for "${item.name}" (batch ${batch.batchNo}). Available: ${currentQuantity} units, Requested: ${unitsToDeduct} units${saleUnit === 'pack' ? ` (${line.quantity} packs × ${packSize})` : ''}`,
+          message: `Insufficient stock for "${item.name}" (batch ${batch.batchNo}). Available: ${currentQuantity} units, Requested: ${unitsToCheck} units${saleUnit === 'pack' ? ` (${line.quantity} packs × ${packSize})` : ''}`,
         });
         continue;
       }
@@ -177,8 +179,10 @@ export class SalesService {
         resolvedLines.push({
           itemId: line.itemId,
           batchId,
-          quantity: unitsToDeduct,
+          quantity: line.quantity,
           unitPrice: Number(batch.packPrice),
+          saleUnit: 'pack',
+          packSize,
         });
       } else {
         if (!batch.sellingPrice) {
@@ -194,6 +198,8 @@ export class SalesService {
           batchId,
           quantity: line.quantity,
           unitPrice: Number(batch.sellingPrice),
+          saleUnit: 'single',
+          packSize,
         });
       }
     }
@@ -240,11 +246,12 @@ export class SalesService {
     });
 
     for (const line of resolvedLines) {
+      const unitsToDeduct = line.saleUnit === 'pack' ? line.quantity * line.packSize : line.quantity;
       await this.stockMovementsService.record({
         batchId: line.batchId,
         locationId: dispatcherLocationId,
         type: 'sale',
-        quantity: -line.quantity,
+        quantity: -unitsToDeduct,
         refId: result.sale.id,
         refType: 'sale',
         createdBy: userId,

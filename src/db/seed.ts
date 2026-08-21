@@ -27,9 +27,9 @@ const IDS = {
     `a1000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
   batches: Array.from({ length: 22 }, (_, i) =>
     `a2000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
-  stockMovements: Array.from({ length: 60 }, (_, i) =>
+  stockMovements: Array.from({ length: 70 }, (_, i) =>
     `a3000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
-  transfers: Array.from({ length: 11 }, (_, i) =>
+  transfers: Array.from({ length: 15 }, (_, i) =>
     `a4000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
   sales: Array.from({ length: 8 }, (_, i) =>
     `a5000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`),
@@ -185,29 +185,29 @@ async function seed() {
 
   // ─── 8. Batches (22 batches with varied expiry dates) ──────────
   const batchesData = [
-    { itemId: createdItems[0].id, grnId: grn1[0].id, batchNo: 'BAT-PAR-001', expiryDate: '2028-01-31', unitCost: '12.00', sellingPrice: '18.00', quantityReceived: 500 },
-    { itemId: createdItems[0].id, grnId: grn5[0].id, batchNo: 'BAT-PAR-002', expiryDate: '2027-06-30', unitCost: '13.50', sellingPrice: '20.00', quantityReceived: 300 },
-    { itemId: createdItems[0].id, grnId: grn6[0].id, batchNo: 'BAT-PAR-003', expiryDate: '2026-09-30', unitCost: '11.00', sellingPrice: '16.00', quantityReceived: 100 },
-    { itemId: createdItems[1].id, grnId: grn2[0].id, batchNo: 'BAT-AMX-001', expiryDate: '2027-08-15', unitCost: '22.00', sellingPrice: '35.00', quantityReceived: 200 },
-    { itemId: createdItems[1].id, grnId: grn6[0].id, batchNo: 'BAT-AMX-002', expiryDate: '2026-12-31', unitCost: '24.00', sellingPrice: '38.00', quantityReceived: 150 },
-    { itemId: createdItems[2].id, grnId: grn3[0].id, batchNo: 'BAT-MET-001', expiryDate: '2027-10-01', unitCost: '18.00', sellingPrice: '28.00', quantityReceived: 400 },
-    { itemId: createdItems[3].id, grnId: grn1[0].id, batchNo: 'BAT-AML-001', expiryDate: '2028-03-15', unitCost: '20.00', sellingPrice: '32.00', quantityReceived: 250 },
-    { itemId: createdItems[4].id, grnId: grn4[0].id, batchNo: 'BAT-OME-001', expiryDate: '2027-05-20', unitCost: '28.00', sellingPrice: '45.00', quantityReceived: 180 },
-    { itemId: createdItems[5].id, grnId: grn3[0].id, batchNo: 'BAT-CIP-001', expiryDate: '2027-09-30', unitCost: '30.00', sellingPrice: '48.00', quantityReceived: 200 },
-    { itemId: createdItems[6].id, grnId: grn5[0].id, batchNo: 'BAT-IBU-001', expiryDate: '2028-02-28', unitCost: '10.00', sellingPrice: '15.00', quantityReceived: 600 },
-    { itemId: createdItems[7].id, grnId: grn2[0].id, batchNo: 'BAT-CET-001', expiryDate: '2027-07-01', unitCost: '15.00', sellingPrice: '24.00', quantityReceived: 300 },
-    { itemId: createdItems[8].id, grnId: grn5[0].id, batchNo: 'BAT-AZI-001', expiryDate: '2027-11-15', unitCost: '40.00', sellingPrice: '65.00', quantityReceived: 120 },
-    { itemId: createdItems[9].id, grnId: grn6[0].id, batchNo: 'BAT-ACT-001', expiryDate: '2027-04-30', unitCost: '65.00', sellingPrice: '100.00', quantityReceived: 100 },
-    { itemId: createdItems[10].id, grnId: grn3[0].id, batchNo: 'BAT-METRO-001', expiryDate: '2028-01-15', unitCost: '12.00', sellingPrice: '19.00', quantityReceived: 350 },
-    { itemId: createdItems[11].id, grnId: grn4[0].id, batchNo: 'BAT-SAL-001', expiryDate: '2027-12-01', unitCost: '130.00', sellingPrice: '200.00', quantityReceived: 40 },
-    { itemId: createdItems[12].id, grnId: grn1[0].id, batchNo: 'BAT-DEX-001', expiryDate: '2027-02-15', unitCost: '8.00', sellingPrice: '12.00', quantityReceived: 200 },
-    { itemId: createdItems[13].id, grnId: grn2[0].id, batchNo: 'BAT-TRA-001', expiryDate: '2027-06-15', unitCost: '18.00', sellingPrice: '28.00', quantityReceived: 80 },
-    { itemId: createdItems[14].id, grnId: grn6[0].id, batchNo: 'BAT-DIA-001', expiryDate: '2028-04-30', unitCost: '10.00', sellingPrice: '16.00', quantityReceived: 60 },
-    { itemId: createdItems[15].id, grnId: grn5[0].id, batchNo: 'BAT-PAN-001', expiryDate: '2027-09-10', unitCost: '35.00', sellingPrice: '55.00', quantityReceived: 150 },
-    { itemId: createdItems[16].id, grnId: grn3[0].id, batchNo: 'BAT-LOS-001', expiryDate: '2027-05-15', unitCost: '25.00', sellingPrice: '40.00', quantityReceived: 200 },
-    { itemId: createdItems[17].id, grnId: grn4[0].id, batchNo: 'BAT-CEP-001', expiryDate: '2027-03-25', unitCost: '35.00', sellingPrice: '55.00', quantityReceived: 100 },
-    { itemId: createdItems[18].id, grnId: grn1[0].id, batchNo: 'BAT-ORS-001', expiryDate: '2028-06-30', unitCost: '5.00', sellingPrice: '8.00', quantityReceived: 1000 },
-    { itemId: createdItems[19].id, grnId: grn4[0].id, batchNo: 'BAT-VTC-001', expiryDate: '2027-12-31', unitCost: '8.00', sellingPrice: '12.00', quantityReceived: 400 },
+    { itemId: createdItems[0].id, grnId: grn1[0].id, batchNo: 'BAT-PAR-001', expiryDate: '2028-01-31', unitCost: '12.00', sellingPrice: '18.00', quantityReceived: 500, packSize: 10 },
+    { itemId: createdItems[0].id, grnId: grn5[0].id, batchNo: 'BAT-PAR-002', expiryDate: '2027-06-30', unitCost: '13.50', sellingPrice: '20.00', quantityReceived: 300, packSize: 10 },
+    { itemId: createdItems[0].id, grnId: grn6[0].id, batchNo: 'BAT-PAR-003', expiryDate: '2026-09-30', unitCost: '11.00', sellingPrice: '16.00', quantityReceived: 100, packSize: 10 },
+    { itemId: createdItems[1].id, grnId: grn2[0].id, batchNo: 'BAT-AMX-001', expiryDate: '2027-08-15', unitCost: '22.00', sellingPrice: '35.00', quantityReceived: 200, packSize: 10 },
+    { itemId: createdItems[1].id, grnId: grn6[0].id, batchNo: 'BAT-AMX-002', expiryDate: '2026-12-31', unitCost: '24.00', sellingPrice: '38.00', quantityReceived: 150, packSize: 10 },
+    { itemId: createdItems[2].id, grnId: grn3[0].id, batchNo: 'BAT-MET-001', expiryDate: '2027-10-01', unitCost: '18.00', sellingPrice: '28.00', quantityReceived: 400, packSize: 10 },
+    { itemId: createdItems[3].id, grnId: grn1[0].id, batchNo: 'BAT-AML-001', expiryDate: '2028-03-15', unitCost: '20.00', sellingPrice: '32.00', quantityReceived: 250, packSize: 10 },
+    { itemId: createdItems[4].id, grnId: grn4[0].id, batchNo: 'BAT-OME-001', expiryDate: '2027-05-20', unitCost: '28.00', sellingPrice: '45.00', quantityReceived: 180, packSize: 10 },
+    { itemId: createdItems[5].id, grnId: grn3[0].id, batchNo: 'BAT-CIP-001', expiryDate: '2027-09-30', unitCost: '30.00', sellingPrice: '48.00', quantityReceived: 200, packSize: 10 },
+    { itemId: createdItems[6].id, grnId: grn5[0].id, batchNo: 'BAT-IBU-001', expiryDate: '2028-02-28', unitCost: '10.00', sellingPrice: '15.00', quantityReceived: 600, packSize: 10 },
+    { itemId: createdItems[7].id, grnId: grn2[0].id, batchNo: 'BAT-CET-001', expiryDate: '2027-07-01', unitCost: '15.00', sellingPrice: '24.00', quantityReceived: 300, packSize: 10 },
+    { itemId: createdItems[8].id, grnId: grn5[0].id, batchNo: 'BAT-AZI-001', expiryDate: '2027-11-15', unitCost: '40.00', sellingPrice: '65.00', quantityReceived: 120, packSize: 10 },
+    { itemId: createdItems[9].id, grnId: grn6[0].id, batchNo: 'BAT-ACT-001', expiryDate: '2027-04-30', unitCost: '65.00', sellingPrice: '100.00', quantityReceived: 100, packSize: 10 },
+    { itemId: createdItems[10].id, grnId: grn3[0].id, batchNo: 'BAT-METRO-001', expiryDate: '2028-01-15', unitCost: '12.00', sellingPrice: '19.00', quantityReceived: 350, packSize: 10 },
+    { itemId: createdItems[11].id, grnId: grn4[0].id, batchNo: 'BAT-SAL-001', expiryDate: '2027-12-01', unitCost: '130.00', sellingPrice: '200.00', quantityReceived: 40, packSize: 10 },
+    { itemId: createdItems[12].id, grnId: grn1[0].id, batchNo: 'BAT-DEX-001', expiryDate: '2027-02-15', unitCost: '8.00', sellingPrice: '12.00', quantityReceived: 200, packSize: 10 },
+    { itemId: createdItems[13].id, grnId: grn2[0].id, batchNo: 'BAT-TRA-001', expiryDate: '2027-06-15', unitCost: '18.00', sellingPrice: '28.00', quantityReceived: 80, packSize: 10 },
+    { itemId: createdItems[14].id, grnId: grn6[0].id, batchNo: 'BAT-DIA-001', expiryDate: '2028-04-30', unitCost: '10.00', sellingPrice: '16.00', quantityReceived: 60, packSize: 10 },
+    { itemId: createdItems[15].id, grnId: grn5[0].id, batchNo: 'BAT-PAN-001', expiryDate: '2027-09-10', unitCost: '35.00', sellingPrice: '55.00', quantityReceived: 150, packSize: 10 },
+    { itemId: createdItems[16].id, grnId: grn3[0].id, batchNo: 'BAT-LOS-001', expiryDate: '2027-05-15', unitCost: '25.00', sellingPrice: '40.00', quantityReceived: 200, packSize: 10 },
+    { itemId: createdItems[17].id, grnId: grn4[0].id, batchNo: 'BAT-CEP-001', expiryDate: '2027-03-25', unitCost: '35.00', sellingPrice: '55.00', quantityReceived: 100, packSize: 10 },
+    { itemId: createdItems[18].id, grnId: grn1[0].id, batchNo: 'BAT-ORS-001', expiryDate: '2028-06-30', unitCost: '5.00', sellingPrice: '8.00', quantityReceived: 1000, packSize: 10 },
+    { itemId: createdItems[19].id, grnId: grn4[0].id, batchNo: 'BAT-VTC-001', expiryDate: '2027-12-31', unitCost: '8.00', sellingPrice: '12.00', quantityReceived: 400, packSize: 10 },
   ];
 
   const createdBatches: any[] = [];
@@ -235,14 +235,18 @@ async function seed() {
     { batchIdx: 0, quantity: 80 },
     { batchIdx: 1, quantity: 50 },
     { batchIdx: 3, quantity: 40 },
+    { batchIdx: 5, quantity: 50 },
     { batchIdx: 6, quantity: 30 },
+    { batchIdx: 7, quantity: 30 },
     { batchIdx: 8, quantity: 100 },
     { batchIdx: 10, quantity: 50 },
     { batchIdx: 11, quantity: 25 },
+    { batchIdx: 12, quantity: 20 },
     { batchIdx: 13, quantity: 40 },
+    { batchIdx: 14, quantity: 15 },
     { batchIdx: 16, quantity: 20 },
     { batchIdx: 17, quantity: 15 },
-    { batchIdx: 20, quantity: 150 },
+    { batchIdx: 20, quantity: 100 },
   ];
 
   let smIdx = createdBatches.length;

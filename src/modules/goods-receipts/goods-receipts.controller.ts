@@ -204,6 +204,23 @@ export class GoodsReceiptsController {
     return this.service.findById(id);
   }
 
+  @Post(':id/items')
+  @Roles('admin', 'store_keeper')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Add a new batch item to an existing goods receipt' })
+  @ApiParam({ name: 'id', description: 'GRN UUID' })
+  @ApiResponse({ status: 201, description: 'Item added successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 404, description: 'GRN not found' })
+  @ApiResponse({ status: 409, description: 'Batch number already exists' })
+  addItem(
+    @Param('id') id: string,
+    @Body() body: CreateGoodsReceiptDto['items'][0],
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.service.addItem(id, body, userId);
+  }
+
   @Patch(':id')
   @Roles('admin', 'store_keeper')
   @UseInterceptors(
